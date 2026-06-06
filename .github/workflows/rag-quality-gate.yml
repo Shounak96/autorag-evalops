@@ -1,0 +1,58 @@
+name: AutoRAG Quality Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  rag-quality-gate:
+    name: Run RAG regression quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      AUTORAG_API_BASE_URL: ${{ vars.AUTORAG_API_BASE_URL }}
+      AUTORAG_DATASET_ID: ${{ vars.AUTORAG_DATASET_ID }}
+      AUTORAG_PROMPT_VERSION_ID: ${{ vars.AUTORAG_PROMPT_VERSION_ID }}
+      AUTORAG_CI_GATE_TOKEN: ${{ secrets.AUTORAG_CI_GATE_TOKEN }}
+
+      AUTORAG_TOP_K: "5"
+      AUTORAG_VECTOR_WEIGHT: "0.7"
+      AUTORAG_KEYWORD_WEIGHT: "0.3"
+      AUTORAG_USE_QUERY_REWRITE: "false"
+      AUTORAG_MAX_REWRITTEN_QUERIES: "4"
+
+      AUTORAG_MIN_PASS_RATE: "0.8"
+      AUTORAG_MIN_RETRIEVAL_SCORE: "0.2"
+      AUTORAG_MIN_GROUNDING_SCORE: "0.75"
+      AUTORAG_MIN_CITATION_COVERAGE: "1.0"
+      AUTORAG_MIN_ANSWER_SCORE: "0.6"
+      AUTORAG_MAX_UNSUPPORTED_CLAIMS: "0"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Run AutoRAG regression gate
+        run: python scripts/run_ci_quality_gate.py
+
+      - name: Upload quality-gate report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: autorag-quality-gate-report
+          path: artifacts/ci-quality-gate-report.json
+          if-no-files-found: warn

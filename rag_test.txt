@@ -1,0 +1,7 @@
+AutoRAG EvalOps is a platform for evaluating RAG applications.
+
+It checks retrieval accuracy, citation coverage, grounding quality, unsupported claims, and latency.
+
+Developers can upload documents, create evaluation test cases, run RAG evaluations, and compare prompt versions.
+
+The platform can also be connected to CI/CD pipelines so deployment can fail if RAG quality drops below a required threshold.

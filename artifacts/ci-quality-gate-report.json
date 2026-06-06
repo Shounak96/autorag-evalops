@@ -1,0 +1,90 @@
+{
+  "rag_run_id": "81fae6d8-17d2-475b-ba13-a64100512961",
+  "dataset_id": "3123162a-4427-49f9-9116-afecb2743196",
+  "dataset_name": "AutoRAG Core Regression Tests",
+  "prompt_version_id": "973132c5-0e64-46ed-b874-dca745f77609",
+  "prompt_version_name": "Balanced Citation Prompt",
+  "status": "completed",
+  "quality_gate_passed": false,
+  "total_cases": 3,
+  "passed_cases": 0,
+  "failed_cases": 3,
+  "pass_rate": 0.0,
+  "avg_answer_score": 0.75,
+  "avg_retrieval_score": 0.4377,
+  "avg_citation_coverage": 1.0,
+  "avg_grounding_score": 1.0,
+  "total_unsupported_claims": 0,
+  "avg_latency_ms": 11401.33,
+  "thresholds": {
+    "min_pass_rate": 0.8,
+    "min_retrieval_score": 0.99,
+    "min_grounding_score": 0.75,
+    "min_citation_coverage": 1.0,
+    "min_answer_score": 0.6,
+    "max_unsupported_claims": 0
+  },
+  "results": [
+    {
+      "test_case_id": "527d01e0-e992-4b26-8d2b-2f780ff55a2f",
+      "child_rag_run_id": "44f3e691-83c6-4a9c-9f17-68ce2902b452",
+      "question": "What quality metrics does AutoRAG EvalOps evaluate before deployment?",
+      "expected_answer": "AutoRAG EvalOps evaluates retrieval accuracy, citation coverage, grounding quality, unsupported claims, and latency.",
+      "generated_answer": "AutoRAG EvalOps evaluates retrieval accuracy, citation coverage, grounding quality, unsupported claims, and latency [S1], [S2].",
+      "passed": false,
+      "failure_reasons": [
+        "Retrieval score is below the configured threshold."
+      ],
+      "required_document_hit": true,
+      "answer_score": 1.0,
+      "retrieval_score": 0.4269,
+      "citation_coverage": 1.0,
+      "grounding_score": 1.0,
+      "unsupported_claims_count": 0,
+      "latency_ms": 11060,
+      "answer_generation_strategy": "llm_citation_first",
+      "verification_strategy": "llm_claim_verifier"
+    },
+    {
+      "test_case_id": "4eaba291-4f67-4a4b-8a49-e7c672c7708a",
+      "child_rag_run_id": "efd11f72-3b40-4355-acfb-026d0853923d",
+      "question": "What happens when RAG quality drops below the required threshold?",
+      "expected_answer": "The deployment can fail when RAG quality drops below the required threshold.",
+      "generated_answer": "Deployment can fail if the platform is connected to CI/CD pipelines [S1] [S2].",
+      "passed": false,
+      "failure_reasons": [
+        "Answer score is below the configured threshold.",
+        "Retrieval score is below the configured threshold."
+      ],
+      "required_document_hit": true,
+      "answer_score": 0.25,
+      "retrieval_score": 0.3859,
+      "citation_coverage": 1.0,
+      "grounding_score": 1.0,
+      "unsupported_claims_count": 0,
+      "latency_ms": 10856,
+      "answer_generation_strategy": "llm_citation_first",
+      "verification_strategy": "llm_claim_verifier"
+    },
+    {
+      "test_case_id": "6c704d64-ae7f-4b37-b66d-0418571a86b2",
+      "child_rag_run_id": "61166e08-effa-48ac-a565-354c99d2749d",
+      "question": "What can developers do inside AutoRAG EvalOps?",
+      "expected_answer": "Developers can upload documents, create evaluation test cases, run RAG evaluations, and compare prompt versions.",
+      "generated_answer": "Inside AutoRAG EvalOps, developers can upload documents, create evaluation test cases, run RAG evaluations, and compare prompt versions [S1], [S2]. They can also connect the platform to CI/CD pipelines so that deployment can fail if RAG quality drops below a required threshold [S1], [S2].",
+      "passed": false,
+      "failure_reasons": [
+        "Retrieval score is below the configured threshold."
+      ],
+      "required_document_hit": true,
+      "answer_score": 1.0,
+      "retrieval_score": 0.5003,
+      "citation_coverage": 1.0,
+      "grounding_score": 1.0,
+      "unsupported_claims_count": 0,
+      "latency_ms": 12288,
+      "answer_generation_strategy": "llm_citation_first",
+      "verification_strategy": "llm_claim_verifier"
+    }
+  ]
+}
