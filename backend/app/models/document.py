@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -20,6 +20,11 @@ class Document(Base):
     file_type: Mapped[str] = mapped_column(String(50), nullable=False)
     file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    content_hash: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+
     status: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
@@ -31,9 +36,9 @@ class Document(Base):
     source_path: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
     )
 
     chunks = relationship(

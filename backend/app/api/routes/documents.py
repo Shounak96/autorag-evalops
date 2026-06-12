@@ -10,8 +10,11 @@ from app.schemas.document import (
     SearchResponse,
 )
 from app.services.document_service import (
+    DuplicateDocumentError,
     create_document_record,
+    delete_saved_file,
     get_chunks_by_document_id,
+    get_document_by_content_hash,
     get_document_by_id,
     get_documents,
     process_document,
@@ -28,9 +31,26 @@ def upload_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
+    source_path: str | None = None
+
     try:
         file_type = validate_file(file)
-        source_path, file_size = save_uploaded_file(file)
+
+        source_path, file_size, content_hash = (
+            save_uploaded_file(file)
+        )
+
+        existing_document = get_document_by_content_hash(
+            db=db,
+            content_hash=content_hash,
+        )
+
+        if existing_document:
+            raise DuplicateDocumentError(
+                "Duplicate document rejected. "
+                f"Identical content already exists as "
+                f"'{existing_document.file_name}'."
+            )
 
         document = create_document_record(
             db=db,
@@ -38,17 +58,30 @@ def upload_document(
             file_type=file_type,
             file_size=file_size,
             source_path=source_path,
+            content_hash=content_hash,
         )
 
         return document
 
+    except DuplicateDocumentError as error:
+        delete_saved_file(source_path)
+
+        raise HTTPException(
+            status_code=409,
+            detail=str(error),
+        )
+
     except ValueError as error:
+        delete_saved_file(source_path)
+
         raise HTTPException(
             status_code=400,
             detail=str(error),
         )
 
     except Exception as error:
+        delete_saved_file(source_path)
+
         raise HTTPException(
             status_code=500,
             detail=f"Document upload failed: {str(error)}",

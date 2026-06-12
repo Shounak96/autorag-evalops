@@ -1,10 +1,11 @@
+import hashlib
 import os
-import shutil
 import uuid
 from pathlib import Path
 
 from fastapi import UploadFile
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.document import Document
@@ -13,6 +14,10 @@ from app.services.chunking_service import create_chunks_from_pages
 from app.services.embedding_service import generate_embedding, generate_embeddings
 from app.services.text_extraction_service import extract_text
 
+class DuplicateDocumentError(ValueError):
+    """
+    Raised when uploaded file contents already exist in the platform.
+    """
 
 UPLOAD_DIR = Path("uploads")
 
@@ -36,7 +41,18 @@ def validate_file(file: UploadFile) -> str:
     return extension.replace(".", "")
 
 
-def save_uploaded_file(file: UploadFile) -> tuple[str, int]:
+def save_uploaded_file(
+    file: UploadFile,
+) -> tuple[str, int, str]:
+    """
+    Saves the uploaded file and calculates its SHA-256 content hash
+    during the same streaming operation.
+
+    Returns:
+    - source_path
+    - file_size
+    - content_hash
+    """
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
     original_name = file.filename or "uploaded_file"
@@ -45,12 +61,48 @@ def save_uploaded_file(file: UploadFile) -> tuple[str, int]:
     safe_file_name = f"{uuid.uuid4()}{extension}"
     destination_path = UPLOAD_DIR / safe_file_name
 
+    sha256 = hashlib.sha256()
+
     with destination_path.open("wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        while True:
+            chunk = file.file.read(1024 * 1024)
+
+            if not chunk:
+                break
+
+            buffer.write(chunk)
+            sha256.update(chunk)
 
     file_size = os.path.getsize(destination_path)
+    content_hash = sha256.hexdigest()
 
-    return str(destination_path), file_size
+    return str(destination_path), file_size, content_hash
+
+def delete_saved_file(source_path: str | None) -> None:
+    """
+    Removes a saved upload when database validation fails.
+    """
+    if not source_path:
+        return
+
+    path = Path(source_path)
+
+    if path.exists():
+        path.unlink()
+
+
+def get_document_by_content_hash(
+    db: Session,
+    content_hash: str,
+) -> Document | None:
+    """
+    Finds an existing document with identical file contents.
+    """
+    return (
+        db.query(Document)
+        .filter(Document.content_hash == content_hash)
+        .first()
+    )
 
 
 def create_document_record(
@@ -59,21 +111,37 @@ def create_document_record(
     file_type: str,
     file_size: int,
     source_path: str,
+    content_hash: str,
 ) -> Document:
+    """
+    Creates a document record after content-hash validation.
+
+    PostgreSQL uniqueness protection is handled as an additional
+    defense against concurrent duplicate uploads.
+    """
     document = Document(
         file_name=file_name,
         file_type=file_type,
         file_size=file_size,
+        content_hash=content_hash,
         status="uploaded",
         total_chunks=0,
         source_path=source_path,
     )
 
-    db.add(document)
-    db.commit()
-    db.refresh(document)
+    try:
+        db.add(document)
+        db.commit()
+        db.refresh(document)
 
-    return document
+        return document
+
+    except IntegrityError as error:
+        db.rollback()
+
+        raise DuplicateDocumentError(
+            "A document with identical content already exists."
+        ) from error
 
 
 def get_documents(db: Session) -> list[Document]:

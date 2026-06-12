@@ -12,7 +12,7 @@ from app.models.agent_step import AgentStep
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.rag_run import RagRun
-from app.services.embedding_service import generate_embedding
+from app.services.embedding_service import generate_embeddings
 from app.services.llm_service import (
     LLMUnavailableError,
     generate_grounded_answer_with_llm,
@@ -200,11 +200,16 @@ def create_rag_run(
 
 def vector_retrieve_chunks(
     db: Session,
-    query: str,
+    query_embedding: list[float],
     limit: int,
 ) -> list[dict]:
-    query_embedding = generate_embedding(query)
+    """
+    Executes one pgvector similarity search using an embedding
+    that has already been generated.
 
+    Embedding generation is intentionally handled outside this function
+    so rewritten queries can be embedded in one batch.
+    """
     sql = text(
         """
         select
@@ -214,11 +219,17 @@ def vector_retrieve_chunks(
             document_chunks.chunk_index as chunk_index,
             document_chunks.page_number as page_number,
             document_chunks.content as content,
-            1 - (document_chunks.embedding <=> CAST(:query_embedding AS vector)) as vector_score
+            1 - (
+                document_chunks.embedding
+                <=> CAST(:query_embedding AS vector)
+            ) as vector_score
         from document_chunks
-        join documents on documents.id = document_chunks.document_id
+        join documents
+            on documents.id = document_chunks.document_id
         where document_chunks.embedding is not null
-        order by document_chunks.embedding <=> CAST(:query_embedding AS vector)
+        order by
+            document_chunks.embedding
+            <=> CAST(:query_embedding AS vector)
         limit :limit
         """
     )
@@ -233,7 +244,10 @@ def vector_retrieve_chunks(
 
     rows = result.mappings().all()
 
-    return [dict(row) for row in rows]
+    return [
+        dict(row)
+        for row in rows
+    ]
 
 
 def keyword_retrieve_chunks(
@@ -282,13 +296,34 @@ def multi_query_vector_retrieve(
     db: Session,
     queries: list[str],
     limit_per_query: int,
-) -> list[dict]:
+) -> tuple[list[dict], int, int]:
+    """
+    Encodes all retrieval queries in one batch, then performs
+    one pgvector search per query.
+
+    Returns:
+    - all_results
+    - embedding_latency_ms
+    - pgvector_search_latency_ms
+    """
+    if not queries:
+        return [], 0, 0
+
+    embedding_start = now_ms()
+    query_embeddings = generate_embeddings(queries)
+    embedding_latency_ms = now_ms() - embedding_start
+
+    pgvector_start = now_ms()
+
     all_results: list[dict] = []
 
-    for query in queries:
+    for query, query_embedding in zip(
+        queries,
+        query_embeddings,
+    ):
         results = vector_retrieve_chunks(
             db=db,
-            query=query,
+            query_embedding=query_embedding,
             limit=limit_per_query,
         )
 
@@ -296,7 +331,9 @@ def multi_query_vector_retrieve(
             result["source_query"] = query
             all_results.append(result)
 
-    return all_results
+    pgvector_latency_ms = now_ms() - pgvector_start
+
+    return all_results, embedding_latency_ms, pgvector_latency_ms
 
 
 def multi_query_keyword_retrieve(
@@ -320,6 +357,46 @@ def multi_query_keyword_retrieve(
             all_results.append(result)
 
     return all_results
+
+def normalize_chunk_content(content: str) -> str:
+    """
+    Creates a stable representation for retrieval deduplication.
+
+    This collapses whitespace and ignores casing so duplicate chunks
+    are removed even when formatting differs slightly.
+    """
+    return re.sub(r"\s+", " ", content).strip().lower()
+
+
+def deduplicate_ranked_chunks(
+    chunks: list[dict],
+) -> list[dict]:
+    """
+    Keeps only the highest-scoring version of each unique chunk body.
+
+    Chunk IDs alone are insufficient because legacy duplicate documents
+    may contain identical text under different IDs.
+    """
+    deduplicated: dict[str, dict] = {}
+
+    for chunk in chunks:
+        normalized_content = normalize_chunk_content(
+            chunk.get("content", "")
+        )
+
+        if not normalized_content:
+            continue
+
+        existing_chunk = deduplicated.get(normalized_content)
+
+        if (
+            existing_chunk is None
+            or float(chunk.get("hybrid_score") or 0.0)
+            > float(existing_chunk.get("hybrid_score") or 0.0)
+        ):
+            deduplicated[normalized_content] = chunk
+
+    return list(deduplicated.values())
 
 
 def hybrid_rerank_chunks(
@@ -381,9 +458,19 @@ def hybrid_rerank_chunks(
             }
         )
 
-    reranked.sort(key=lambda chunk: chunk["hybrid_score"], reverse=True)
+        reranked.sort(
+        key=lambda chunk: chunk["hybrid_score"],
+        reverse=True,
+    )
 
-    return reranked[:top_k]
+    deduplicated_chunks = deduplicate_ranked_chunks(reranked)
+
+    deduplicated_chunks.sort(
+        key=lambda chunk: chunk["hybrid_score"],
+        reverse=True,
+    )
+
+    return deduplicated_chunks[:top_k]
 
 
 def select_relevant_sentences(question: str, content: str, max_sentences: int = 2) -> list[str]:
@@ -614,17 +701,42 @@ def run_advanced_rag(
 
     retrieval_limit = max(top_k * 3, 8)
 
-    step_start = now_ms()
-    vector_results = multi_query_vector_retrieve(
-        db=db,
-        queries=rewritten_queries,
-        limit_per_query=retrieval_limit,
+    vector_results, embedding_latency_ms, pgvector_latency_ms = (
+        multi_query_vector_retrieve(
+            db=db,
+            queries=rewritten_queries,
+            limit_per_query=retrieval_limit,
+        )
     )
+
     log_agent_step(
         db=db,
         rag_run_id=rag_run.id,
-        step_name="multi_query_vector_retrieval",
+        step_name="batch_query_embedding_generation",
         step_order=2,
+        input_data={
+            "queries": rewritten_queries,
+            "query_count": len(rewritten_queries),
+        },
+        output_data={
+            "embedding_count": len(rewritten_queries),
+        },
+        status="success",
+        latency_ms=embedding_latency_ms,
+    )
+    agent_trace.append(
+        {
+            "step_name": "batch_query_embedding_generation",
+            "status": "success",
+            "latency_ms": embedding_latency_ms,
+        }
+    )
+
+    log_agent_step(
+        db=db,
+        rag_run_id=rag_run.id,
+        step_name="multi_query_pgvector_search",
+        step_order=3,
         input_data={
             "queries": rewritten_queries,
             "limit_per_query": retrieval_limit,
@@ -633,13 +745,13 @@ def run_advanced_rag(
             "raw_retrieved_count": len(vector_results),
         },
         status="success",
-        latency_ms=now_ms() - step_start,
+        latency_ms=pgvector_latency_ms,
     )
     agent_trace.append(
         {
-            "step_name": "multi_query_vector_retrieval",
+            "step_name": "multi_query_pgvector_search",
             "status": "success",
-            "latency_ms": now_ms() - step_start,
+            "latency_ms": pgvector_latency_ms,
         }
     )
 
@@ -654,7 +766,7 @@ def run_advanced_rag(
         db=db,
         rag_run_id=rag_run.id,
         step_name="multi_query_keyword_retrieval",
-        step_order=3,
+        step_order=4,
         input_data={
             "queries": rewritten_queries,
             "limit_per_query": retrieval_limit,
@@ -682,11 +794,22 @@ def run_advanced_rag(
         vector_weight=vector_weight,
         keyword_weight=keyword_weight,
     )
+
+    raw_unique_chunk_ids = {
+        item["chunk_id"]
+        for item in vector_results + keyword_results
+    }
+
+    duplicate_chunks_removed = max(
+        len(raw_unique_chunk_ids) - len(ranked_chunks),
+        0,
+    )
+
     log_agent_step(
         db=db,
         rag_run_id=rag_run.id,
         step_name="hybrid_reranking",
-        step_order=4,
+        step_order=5,
         input_data={
             "vector_count": len(vector_results),
             "keyword_count": len(keyword_results),
@@ -696,7 +819,11 @@ def run_advanced_rag(
         },
         output_data={
             "selected_count": len(ranked_chunks),
-            "top_scores": [chunk["hybrid_score"] for chunk in ranked_chunks],
+            "duplicate_chunks_removed": duplicate_chunks_removed,
+            "top_scores": [
+                chunk["hybrid_score"]
+                for chunk in ranked_chunks
+            ],
         },
         status="success",
         latency_ms=now_ms() - step_start,
@@ -743,7 +870,7 @@ def run_advanced_rag(
         db=db,
         rag_run_id=rag_run.id,
         step_name="citation_first_answer_generation",
-        step_order=5,
+        step_order=6,
         input_data={
             "question": question,
             "selected_chunks": [chunk["chunk_id"] for chunk in ranked_chunks],
@@ -782,7 +909,7 @@ def run_advanced_rag(
         db=db,
         rag_run_id=rag_run.id,
         step_name="claim_level_grounding_verification",
-        step_order=6,
+        step_order=7,
         input_data={
             "question": question,
             "answer": answer,
@@ -837,7 +964,7 @@ def run_advanced_rag(
         db=db,
         rag_run_id=rag_run.id,
         step_name="quality_scoring",
-        step_order=7,
+        step_order=8,
         input_data={
             "ranked_chunk_count": len(ranked_chunks),
             "rewritten_queries": rewritten_queries,

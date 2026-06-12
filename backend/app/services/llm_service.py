@@ -1,12 +1,13 @@
 import json
 import re
 from functools import lru_cache
-
+import logging
 from google import genai
 from google.genai import types
 
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
 
 class LLMUnavailableError(Exception):
     pass
@@ -115,16 +116,14 @@ Return exactly this format:
 
         raw_text = response.text or ""
 
-        print("===== GEMINI RAW QUERY REWRITE OUTPUT =====")
-        print(raw_text)
-        print("===========================================")
-
         llm_queries = extract_json_array(raw_text)
 
     except Exception as error:
-        print("===== GEMINI QUERY REWRITE ERROR =====")
-        print(error)
-        print("======================================")
+        logger.warning(
+        "Gemini query rewrite unavailable; using deterministic fallback. "
+        "Error type: %s",
+        type(error).__name__,
+        )
         llm_queries = []
 
     fallback_queries = build_rule_based_rewrite_queries(
@@ -403,10 +402,6 @@ Document sources:
     )
 
     raw_text = response.text or ""
-
-    print("===== GEMINI RAW VERIFIER OUTPUT =====")
-    print(raw_text)
-    print("======================================")
 
     parsed_report = extract_json_object(raw_text)
 
