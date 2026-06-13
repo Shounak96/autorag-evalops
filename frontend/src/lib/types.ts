@@ -13,7 +13,7 @@ export interface PromptVersion {
   created_at: string;
 }
 
-export interface PromptVersionListResponse {
+export interface PromptListResponse {
   prompts: PromptVersion[];
   count: number;
 }

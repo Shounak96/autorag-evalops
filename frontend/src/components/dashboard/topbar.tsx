@@ -26,6 +26,10 @@ const routeMetadata: Record<string, RouteMetadata> = {
     eyebrow: "Evaluation History",
     title: "Evaluation Runs",
   },
+  "/prompts": {
+    eyebrow: "Prompt Engineering",
+    title: "Prompt Versions",
+  },
 };
 
 export function Topbar() {

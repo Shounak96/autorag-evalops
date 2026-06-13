@@ -1,11 +1,11 @@
 import { RagPlayground } from "@/components/playground/rag-playground";
 import { apiGet } from "@/lib/api";
-import type { PromptVersionListResponse } from "@/lib/types";
+import type { PromptListResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function PlaygroundPage() {
-  const prompts = await apiGet<PromptVersionListResponse>(
+  const prompts = await apiGet<PromptListResponse>(
     "/prompts",
     {
       prompts: [],

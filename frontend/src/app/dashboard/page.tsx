@@ -18,7 +18,7 @@ import type {
   EvalDatasetListResponse,
   EvalRunListResponse,
   PromptComparisonListResponse,
-  PromptVersionListResponse,
+  PromptListResponse,
 } from "@/lib/types";
 
 function formatPercentage(value: number): string {
@@ -67,9 +67,9 @@ export default async function DashboardPage() {
       "/eval/datasets",
       { datasets: [], count: 0 } as EvalDatasetListResponse,
     ),
-    apiGet<PromptVersionListResponse>(
+    apiGet<PromptListResponse>(
       "/prompts",
-      { prompts: [], count: 0 } as PromptVersionListResponse,
+      { prompts: [], count: 0 } as PromptListResponse,
     ),
     apiGet<EvalRunListResponse>(
       "/eval/runs?limit=8",
