@@ -22,6 +22,10 @@ const routeMetadata: Record<string, RouteMetadata> = {
     eyebrow: "Knowledge Base",
     title: "Document Management",
   },
+  "/runs": {
+    eyebrow: "Evaluation History",
+    title: "Evaluation Runs",
+  },
 };
 
 export function Topbar() {

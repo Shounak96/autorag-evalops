@@ -174,3 +174,31 @@ export interface DeleteDocumentResponse {
   status: string;
   message: string;
 }
+
+export interface EvalRunResult {
+  id: string;
+  rag_run_id: string;
+  child_rag_run_id: string;
+  test_case_id: string;
+  question: string;
+  generated_answer: string;
+  expected_answer: string;
+  retrieval_score: number;
+  citation_coverage: number;
+  grounding_score: number;
+  answer_score: number;
+  unsupported_claims_count: number;
+  required_document_hit: boolean;
+  answer_generation_strategy: string;
+  verification_strategy: string;
+  passed: boolean;
+  failure_reasons: string[];
+  latency_ms: number;
+  created_at: string;
+}
+
+export interface EvalRunResultsResponse {
+  rag_run_id: string;
+  results: EvalRunResult[];
+  count: number;
+}

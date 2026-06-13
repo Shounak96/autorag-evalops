@@ -131,9 +131,33 @@ export function DocumentsWorkspace() {
     }
   }, []);
 
-  useEffect(() => {
-    refreshDocuments();
-  }, [refreshDocuments]);
+    useEffect(() => {
+    let cancelled = false;
+
+    listDocuments()
+      .then((response) => {
+        if (!cancelled) {
+          setDocuments(response.documents);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setNotice({
+            variant: "error",
+            message: getErrorMessage(error),
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingDocuments(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function chooseFile(file: File | undefined) {
     if (!file) {
