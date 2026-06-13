@@ -44,22 +44,31 @@ export interface EvalRunListResponse {
   count: number;
 }
 
+export interface PromptComparisonMetricDeltas {
+  pass_rate: number;
+  avg_answer_score: number;
+  avg_retrieval_score: number;
+  avg_citation_coverage: number;
+  avg_grounding_score: number;
+  avg_latency_ms: number;
+}
+
 export interface PromptComparison {
   comparison_id: string;
   dataset_id: string;
-  dataset_name: string | null;
-  prompt_version_a_id: string | null;
+  dataset_name: string;
+  prompt_version_a_id: string;
   prompt_version_a_name: string;
-  prompt_version_b_id: string | null;
+  prompt_version_b_id: string;
   prompt_version_b_name: string;
-  run_a_id: string | null;
-  run_b_id: string | null;
+  run_a_id: string;
+  run_b_id: string;
   winner: string;
   score_a: number;
   score_b: number;
   comparison_valid: boolean;
   comparison_warning: string | null;
-  metric_deltas_b_minus_a: Record<string, number>;
+  metric_deltas_b_minus_a: PromptComparisonMetricDeltas;
   created_at: string;
 }
 
@@ -202,3 +211,4 @@ export interface EvalRunResultsResponse {
   results: EvalRunResult[];
   count: number;
 }
+
