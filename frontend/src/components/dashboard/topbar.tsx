@@ -34,6 +34,10 @@ const routeMetadata: Record<string, RouteMetadata> = {
     eyebrow: "Prompt A/B Testing",
     title: "A/B Comparisons",
   },
+  "/quality-gate": {
+    eyebrow: "Deployment Safety",
+    title: "Quality Gate",
+  },
 };
 
 export function Topbar() {
