@@ -1,0 +1,1 @@
+Temporary document used only to verify delete endpoint.

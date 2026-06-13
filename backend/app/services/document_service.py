@@ -159,6 +159,20 @@ def get_document_by_id(db: Session, document_id: str) -> Document | None:
         .first()
     )
 
+def delete_document(
+    db: Session,
+    document: Document,
+) -> None:
+    """
+    Deletes a document, its related chunks, and its saved upload file.
+    """
+    source_path = document.source_path
+
+    db.delete(document)
+    db.commit()
+
+    delete_saved_file(source_path)
+
 
 def get_chunks_by_document_id(
     db: Session,

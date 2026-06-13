@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   BookOpenText,
   BrainCircuit,
-  CheckCircle2,
   ChevronDown,
   Clock3,
   FileText,

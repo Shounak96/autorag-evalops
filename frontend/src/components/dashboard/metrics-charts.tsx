@@ -53,7 +53,16 @@ export function MetricsCharts({
           {data.length === 0 ? (
             <EmptyChartState />
           ) : (
-            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={0}
+              minHeight={280}
+              initialDimension={{
+                width: 800,
+                height: 280,
+              }}
+            >
               <LineChart data={data}>
                 <CartesianGrid
                   strokeDasharray="4 4"
@@ -123,7 +132,16 @@ export function MetricsCharts({
           {data.length === 0 ? (
             <EmptyChartState />
           ) : (
-            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={0}
+              minHeight={280}
+              initialDimension={{
+                width: 800,
+                height: 280,
+              }}
+            >
               <AreaChart data={data}>
                 <defs>
                   <linearGradient

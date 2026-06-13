@@ -1,11 +1,13 @@
+from datetime import datetime, timezone
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from app.api.router import api_router
 from app.core.config import settings
-from app.services.embedding_service import warm_up_embedding_model
+from app.db import engine
+from app.services.embedding_service import warm_up_embedding_model, get_embedding_model
 import logging
 
 logger = logging.getLogger(__name__)
@@ -56,5 +58,44 @@ def root():
         "health": "/health",
     }
 
+@app.get("/health")
+def health_check():
+    """
+    Returns API, database, and embedding-model readiness.
+
+    The frontend uses this endpoint for its live connection badge.
+    """
+    database_connected = False
+    embedding_model_ready = False
+
+    try:
+        with Session(engine) as db:
+            db.execute(text("select 1"))
+
+        database_connected = True
+
+    except Exception:
+        database_connected = False
+
+    try:
+        get_embedding_model()
+        embedding_model_ready = True
+
+    except Exception:
+        embedding_model_ready = False
+
+    healthy = (
+        database_connected
+        and embedding_model_ready
+    )
+
+    return {
+        "status": "healthy" if healthy else "degraded",
+        "service": "AutoRAG EvalOps API",
+        "database_connected": database_connected,
+        "embedding_model_ready": embedding_model_ready,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 app.include_router(api_router)
+

@@ -1,6 +1,7 @@
 "use client";
 
-import { Bell, CircleUserRound, Wifi } from "lucide-react";
+import { Bell, CircleUserRound } from "lucide-react";
+import { HealthStatusBadge } from "@/components/dashboard/health-status-badge";
 import { usePathname } from "next/navigation";
 
 interface RouteMetadata {
@@ -16,6 +17,10 @@ const routeMetadata: Record<string, RouteMetadata> = {
   "/playground": {
     eyebrow: "Agentic RAG Workspace",
     title: "Advanced RAG Playground",
+  },
+  "/documents": {
+    eyebrow: "Knowledge Base",
+    title: "Document Management",
   },
 };
 
@@ -39,10 +44,7 @@ export function Topbar() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 sm:flex">
-            <Wifi className="h-3.5 w-3.5" />
-            Backend connected
-          </div>
+          <HealthStatusBadge />
 
           <button
             type="button"

@@ -21,6 +21,7 @@ from app.services.document_service import (
     save_uploaded_file,
     semantic_search_chunks,
     validate_file,
+    delete_document,
 )
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
@@ -195,3 +196,41 @@ def list_document_chunks(
         "chunks": chunks,
         "count": len(chunks),
     }
+
+
+@router.delete("/{document_id}")
+def delete_uploaded_document(
+    document_id: str,
+    db: Session = Depends(get_db),
+):
+    document = get_document_by_id(
+        db=db,
+        document_id=document_id,
+    )
+
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found",
+        )
+
+    try:
+        deleted_file_name = document.file_name
+
+        delete_document(
+            db=db,
+            document=document,
+        )
+
+        return {
+            "document_id": document_id,
+            "file_name": deleted_file_name,
+            "status": "deleted",
+            "message": "Document and related chunks deleted successfully",
+        }
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Document deletion failed: {str(error)}",
+        )

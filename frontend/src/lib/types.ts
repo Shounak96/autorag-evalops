@@ -1,7 +1,3 @@
-export interface DocumentListResponse {
-  count: number;
-}
-
 export interface EvalDatasetListResponse {
   datasets: unknown[];
   count: number;
@@ -145,4 +141,36 @@ export interface RagAskResponse {
   verification_report: GroundingVerificationReport;
   metrics: RagMetrics;
   agent_trace: AgentTraceStep[];
+}
+
+
+export interface DocumentRecord {
+  id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number | null;
+  status: string;
+  total_chunks: number;
+  source_path: string | null;
+  content_hash: string | null;
+  created_at: string;
+}
+
+export interface DocumentListResponse {
+  documents: DocumentRecord[];
+  count: number;
+}
+
+export interface ProcessDocumentResponse {
+  document_id: string;
+  status: string;
+  total_chunks: number;
+  message: string;
+}
+
+export interface DeleteDocumentResponse {
+  document_id: string;
+  file_name: string;
+  status: string;
+  message: string;
 }

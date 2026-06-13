@@ -58,7 +58,10 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     apiGet<DocumentListResponse>(
       "/documents",
-      { count: 0 },
+      {
+        documents: [],
+        count: 0,
+      },
     ),
     apiGet<EvalDatasetListResponse>(
       "/eval/datasets",
