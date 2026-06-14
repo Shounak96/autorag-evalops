@@ -1,6 +1,105 @@
+export interface EvalDataset {
+  id: string;
+  name: string;
+  description: string | null;
+  test_case_count: number;
+  created_at: string;
+}
+
 export interface EvalDatasetListResponse {
-  datasets: unknown[];
+  datasets: EvalDataset[];
   count: number;
+}
+
+export interface EvalTestCase {
+  id: string;
+  dataset_id: string;
+  question: string;
+  expected_answer: string | null;
+  required_document_name: string | null;
+  tags: string[];
+  created_at: string;
+}
+
+export interface EvalDatasetDetailResponse extends EvalDataset {
+  test_cases: EvalTestCase[];
+}
+
+export interface EvalDatasetCreateRequest {
+  name: string;
+  description?: string | null;
+}
+
+export interface EvalTestCaseCreateRequest {
+  question: string;
+  expected_answer?: string | null;
+  required_document_name?: string | null;
+  tags: string[];
+}
+
+export interface DeleteEvalTestCaseResponse {
+  message: string;
+  deleted_test_case_id: string;
+}
+
+export interface QualityGateThresholds {
+  min_pass_rate: number;
+  min_retrieval_score: number;
+  min_grounding_score: number;
+  min_citation_coverage: number;
+  min_answer_score: number;
+  max_unsupported_claims: number;
+}
+
+export interface EvalDatasetRunRequest {
+  top_k: number;
+  vector_weight: number;
+  keyword_weight: number;
+  use_query_rewrite: boolean;
+  max_rewritten_queries: number;
+  prompt_version_id?: string | null;
+  thresholds: QualityGateThresholds;
+}
+
+export interface EvalCaseRunResponse {
+  test_case_id: string;
+  child_rag_run_id: string | null;
+  question: string;
+  expected_answer: string | null;
+  generated_answer: string | null;
+  passed: boolean;
+  failure_reasons: string[];
+  required_document_hit: boolean;
+  answer_score: number;
+  retrieval_score: number;
+  citation_coverage: number;
+  grounding_score: number;
+  unsupported_claims_count: number;
+  latency_ms: number;
+  answer_generation_strategy: string | null;
+  verification_strategy: string | null;
+}
+
+export interface EvalDatasetRunSummary {
+  rag_run_id: string;
+  dataset_id: string;
+  dataset_name: string;
+  prompt_version_id: string | null;
+  prompt_version_name: string;
+  status: string;
+  quality_gate_passed: boolean;
+  total_cases: number;
+  passed_cases: number;
+  failed_cases: number;
+  pass_rate: number;
+  avg_answer_score: number;
+  avg_retrieval_score: number;
+  avg_citation_coverage: number;
+  avg_grounding_score: number;
+  total_unsupported_claims: number;
+  avg_latency_ms: number;
+  thresholds: QualityGateThresholds;
+  results: EvalCaseRunResponse[];
 }
 
 export interface PromptVersion {
@@ -75,6 +174,46 @@ export interface PromptComparison {
 export interface PromptComparisonListResponse {
   comparisons: PromptComparison[];
   count: number;
+}
+
+export interface PromptComparisonRunSummary {
+  rag_run_id: string;
+  dataset_id: string;
+  dataset_name: string;
+  prompt_version_id: string | null;
+  prompt_version_name: string;
+  status: string;
+  quality_gate_passed: boolean;
+  total_cases: number;
+  passed_cases: number;
+  failed_cases: number;
+  pass_rate: number;
+  avg_answer_score: number;
+  avg_retrieval_score: number;
+  avg_citation_coverage: number;
+  avg_grounding_score: number;
+  total_unsupported_claims: number;
+  avg_latency_ms: number;
+  thresholds: QualityGateThresholds;
+  results: EvalCaseRunResponse[];
+}
+
+export interface PromptComparisonResponse {
+  comparison_id: string;
+  dataset_id: string;
+  dataset_name: string;
+  prompt_version_a_id: string;
+  prompt_version_a_name: string;
+  prompt_version_b_id: string;
+  prompt_version_b_name: string;
+  winner: string;
+  score_a: number;
+  score_b: number;
+  comparison_valid: boolean;
+  comparison_warning: string | null;
+  metric_deltas_b_minus_a: Record<string, number>;
+  run_a: PromptComparisonRunSummary;
+  run_b: PromptComparisonRunSummary;
 }
 
 export interface RagAskRequest {

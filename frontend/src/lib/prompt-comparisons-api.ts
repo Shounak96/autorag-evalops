@@ -1,4 +1,7 @@
-import type { PromptComparisonListResponse } from "@/lib/types";
+import type {
+  PromptComparisonListResponse,
+  PromptComparisonResponse,
+} from "@/lib/types";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
@@ -41,4 +44,49 @@ export async function listPromptComparisons(
   }
 
   return (await response.json()) as PromptComparisonListResponse;
+}
+
+export interface RunPromptComparisonPayload {
+  prompt_version_a_id: string;
+  prompt_version_b_id: string;
+  top_k: number;
+  vector_weight: number;
+  keyword_weight: number;
+  use_query_rewrite: boolean;
+  max_rewritten_queries: number;
+  thresholds: {
+    min_pass_rate: number;
+    min_retrieval_score: number;
+    min_grounding_score: number;
+    min_citation_coverage: number;
+    min_answer_score: number;
+    max_unsupported_claims: number;
+  };
+}
+
+export async function runPromptComparison(
+  datasetId: string,
+  payload: RunPromptComparisonPayload,
+): Promise<PromptComparisonResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/eval/datasets/${datasetId}/compare-prompts`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await parseError(
+        response,
+        "Unable to run prompt comparison.",
+      ),
+    );
+  }
+
+  return (await response.json()) as PromptComparisonResponse;
 }
