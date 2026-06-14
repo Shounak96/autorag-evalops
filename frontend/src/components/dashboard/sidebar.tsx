@@ -72,7 +72,7 @@ const navigationGroups = [
       },
       {
         label: "CI/CD Pipeline",
-        href: "/pipeline",
+        href: "/ci-cd",
         icon: Rocket,
       },
     ],

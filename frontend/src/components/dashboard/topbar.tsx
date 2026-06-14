@@ -38,6 +38,10 @@ const routeMetadata: Record<string, RouteMetadata> = {
     eyebrow: "Deployment Safety",
     title: "Quality Gate",
   },
+    "/ci-cd": {
+    eyebrow: "Deployment Automation",
+    title: "CI/CD Pipeline",
+  },
 };
 
 export function Topbar() {
