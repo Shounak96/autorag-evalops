@@ -18,11 +18,21 @@ import {
   useState,
 } from "react";
 
+import { listDatasets } from "@/lib/datasets-api";
+import { listPrompts } from "@/lib/prompts-api";
+
 import {
   getLatestQualityGateRun,
+  runQualityGate,
   type QualityGateRunDetail,
 } from "@/lib/quality-gate-api";
-import type { EvalRunResult } from "@/lib/types";
+
+import type {
+  EvalDataset,
+  EvalDatasetRunSummary,
+  EvalRunResult,
+  PromptVersion,
+} from "@/lib/types";
 
 function formatPercentage(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
@@ -81,10 +91,44 @@ export function QualityGateWorkspace() {
     useState<QualityGateRunDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+    const [datasets, setDatasets] = useState<EvalDataset[]>([]);
+  const [prompts, setPrompts] = useState<PromptVersion[]>([]);
+
+  const [selectedDatasetId, setSelectedDatasetId] =
+    useState("");
+  const [selectedPromptId, setSelectedPromptId] =
+    useState("");
+
+  const [topK, setTopK] = useState(5);
+  const [vectorWeight, setVectorWeight] = useState(0.7);
+  const [keywordWeight, setKeywordWeight] = useState(0.3);
+  const [useQueryRewrite, setUseQueryRewrite] = useState(false);
+  const [maxRewrittenQueries, setMaxRewrittenQueries] =
+    useState(4);
+
+  const [minPassRate, setMinPassRate] = useState(0.8);
+  const [minRetrievalScore, setMinRetrievalScore] =
+    useState(0.2);
+  const [minGroundingScore, setMinGroundingScore] =
+    useState(0.75);
+  const [minCitationCoverage, setMinCitationCoverage] =
+    useState(1.0);
+  const [minAnswerScore, setMinAnswerScore] =
+    useState(0.6);
+  const [maxUnsupportedClaims, setMaxUnsupportedClaims] =
+    useState(0);
+
+  const [ciGateToken, setCiGateToken] = useState("");
+  const [runningGate, setRunningGate] = useState(false);
+  const [manualGateRun, setManualGateRun] =
+    useState<EvalDatasetRunSummary | null>(null);
+  const [successMessage, setSuccessMessage] =
+    useState<string | null>(null);
 
   async function refreshQualityGate() {
     setLoading(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       const latestRun = await getLatestQualityGateRun();
@@ -100,22 +144,51 @@ export function QualityGateWorkspace() {
   useEffect(() => {
     let cancelled = false;
 
-    getLatestQualityGateRun()
-      .then((latestRun) => {
-        if (!cancelled) {
-          setQualityGateRun(latestRun);
+    async function loadInitialData() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const [
+          latestRun,
+          datasetsResponse,
+          promptsResponse,
+        ] = await Promise.all([
+          getLatestQualityGateRun(),
+          listDatasets(),
+          listPrompts(),
+        ]);
+
+        if (cancelled) {
+          return;
         }
-      })
-      .catch((requestError: unknown) => {
+
+        setQualityGateRun(latestRun);
+        setDatasets(datasetsResponse.datasets);
+        setPrompts(promptsResponse.prompts);
+
+        setSelectedDatasetId(
+          datasetsResponse.datasets[0]?.id ?? "",
+        );
+
+        const defaultPrompt =
+          promptsResponse.prompts.find(
+            (prompt) => prompt.is_default,
+          ) ?? promptsResponse.prompts[0];
+
+        setSelectedPromptId(defaultPrompt?.id ?? "");
+      } catch (requestError: unknown) {
         if (!cancelled) {
           setError(getErrorMessage(requestError));
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) {
           setLoading(false);
         }
-      });
+      }
+    }
+
+    loadInitialData();
 
     return () => {
       cancelled = true;
@@ -127,6 +200,51 @@ export function QualityGateWorkspace() {
 
   const failedCases =
     qualityGateRun?.results.filter((result) => !result.passed) ?? [];
+
+    async function handleRunQualityGate() {
+    if (!selectedDatasetId) {
+      setError("Select a dataset first.");
+      return;
+    }
+
+    setRunningGate(true);
+    setError(null);
+    setSuccessMessage(null);
+    setManualGateRun(null);
+
+    try {
+      const result = await runQualityGate(
+        selectedDatasetId,
+        {
+          top_k: topK,
+          vector_weight: vectorWeight,
+          keyword_weight: keywordWeight,
+          use_query_rewrite: useQueryRewrite,
+          max_rewritten_queries: maxRewrittenQueries,
+          prompt_version_id: selectedPromptId || null,
+          thresholds: {
+            min_pass_rate: minPassRate,
+            min_retrieval_score: minRetrievalScore,
+            min_grounding_score: minGroundingScore,
+            min_citation_coverage: minCitationCoverage,
+            min_answer_score: minAnswerScore,
+            max_unsupported_claims: maxUnsupportedClaims,
+          },
+        },
+        ciGateToken,
+      );
+
+      setManualGateRun(result);
+      setSuccessMessage("Quality gate completed.");
+
+      const latestRun = await getLatestQualityGateRun();
+      setQualityGateRun(latestRun);
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      setRunningGate(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-[1700px]">
@@ -161,6 +279,228 @@ export function QualityGateWorkspace() {
           />
           Refresh gate
         </button>
+      </section>
+
+            {successMessage && (
+        <div className="mt-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-700">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          {successMessage}
+        </div>
+      )}
+
+      <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
+          <div>
+            <h3 className="font-semibold text-slate-950">
+              Run quality gate manually
+            </h3>
+
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+              Select a dataset, prompt version, retrieval settings,
+              and deployment thresholds. The backend will return a
+              pass/fail deployment decision.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRunQualityGate}
+            disabled={runningGate}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+          >
+            {runningGate ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : (
+              <ShieldCheck className="h-4 w-4" />
+            )}
+            Run quality gate
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <SelectField
+            label="Dataset"
+            value={selectedDatasetId}
+            onChange={setSelectedDatasetId}
+            options={datasets.map((dataset) => ({
+              value: dataset.id,
+              label: `${dataset.name} (${dataset.test_case_count} cases)`,
+            }))}
+          />
+
+          <SelectField
+            label="Prompt version"
+            value={selectedPromptId}
+            onChange={setSelectedPromptId}
+            options={prompts.map((prompt) => ({
+              value: prompt.id,
+              label: `${prompt.name}${prompt.is_default ? " — default" : ""}`,
+            }))}
+          />
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-5">
+          <NumberField
+            label="Top K"
+            value={topK}
+            min={1}
+            max={10}
+            step={1}
+            onChange={setTopK}
+          />
+
+          <NumberField
+            label="Vector weight"
+            value={vectorWeight}
+            min={0}
+            max={1}
+            step={0.1}
+            onChange={setVectorWeight}
+          />
+
+          <NumberField
+            label="Keyword weight"
+            value={keywordWeight}
+            min={0}
+            max={1}
+            step={0.1}
+            onChange={setKeywordWeight}
+          />
+
+          <NumberField
+            label="Max rewrites"
+            value={maxRewrittenQueries}
+            min={1}
+            max={6}
+            step={1}
+            onChange={setMaxRewrittenQueries}
+          />
+
+          <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <span className="text-sm font-semibold text-slate-700">
+              Query rewrite
+            </span>
+
+            <input
+              type="checkbox"
+              checked={useQueryRewrite}
+              onChange={(event) =>
+                setUseQueryRewrite(event.target.checked)
+              }
+              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+          </label>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <NumberField
+            label="Min pass rate"
+            value={minPassRate}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={setMinPassRate}
+          />
+
+          <NumberField
+            label="Min retrieval"
+            value={minRetrievalScore}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={setMinRetrievalScore}
+          />
+
+          <NumberField
+            label="Min grounding"
+            value={minGroundingScore}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={setMinGroundingScore}
+          />
+
+          <NumberField
+            label="Min citations"
+            value={minCitationCoverage}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={setMinCitationCoverage}
+          />
+
+          <NumberField
+            label="Min answer"
+            value={minAnswerScore}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={setMinAnswerScore}
+          />
+
+          <NumberField
+            label="Max unsupported"
+            value={maxUnsupportedClaims}
+            min={0}
+            max={10}
+            step={1}
+            onChange={setMaxUnsupportedClaims}
+          />
+        </div>
+
+        <label className="mt-5 block">
+          <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            Optional CI gate token
+          </span>
+
+          <input
+            type="password"
+            value={ciGateToken}
+            onChange={(event) =>
+              setCiGateToken(event.target.value)
+            }
+            placeholder="Leave blank for local testing if backend allows it"
+            className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+          />
+        </label>
+
+        {manualGateRun && (
+          <div
+            className={`mt-5 rounded-2xl border p-4 ${
+              manualGateRun.quality_gate_passed
+                ? "border-emerald-200 bg-emerald-50"
+                : "border-rose-200 bg-rose-50"
+            }`}
+          >
+            <p
+              className={`text-xs font-bold uppercase tracking-wide ${
+                manualGateRun.quality_gate_passed
+                  ? "text-emerald-700"
+                  : "text-rose-700"
+              }`}
+            >
+              Manual quality-gate result
+            </p>
+
+            <h4 className="mt-2 text-lg font-bold text-slate-950">
+              {manualGateRun.quality_gate_passed
+                ? "Deployment allowed"
+                : "Deployment blocked"}
+            </h4>
+
+            <p className="mt-2 text-sm text-slate-600">
+              {manualGateRun.passed_cases}/
+              {manualGateRun.total_cases} cases passed · Pass
+              rate {formatPercentage(manualGateRun.pass_rate)} ·
+              Unsupported claims{" "}
+              {manualGateRun.total_unsupported_claims}
+            </p>
+
+            <p className="mt-2 font-mono text-[11px] text-slate-500">
+              Run ID: {manualGateRun.rag_run_id}
+            </p>
+          </div>
+        )}
       </section>
 
       {error && (
@@ -506,5 +846,85 @@ function MetricCard({
         </div>
       </div>
     </article>
+  );
+}
+
+interface SelectFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{
+    value: string;
+    label: string;
+  }>;
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+}: SelectFieldProps) {
+  return (
+    <label className="block">
+      <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </span>
+
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+      >
+        <option value="">Select {label.toLowerCase()}</option>
+
+        {options.map((option) => (
+          <option
+            key={option.value}
+            value={option.value}
+          >
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+interface NumberFieldProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+}
+
+function NumberField({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: NumberFieldProps) {
+  return (
+    <label className="block">
+      <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </span>
+
+      <input
+        type="number"
+        value={value}
+        min={min}
+        max={max}
+        step={step}
+        onChange={(event) =>
+          onChange(Number(event.target.value))
+        }
+        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+      />
+    </label>
   );
 }

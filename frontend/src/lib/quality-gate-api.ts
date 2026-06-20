@@ -1,4 +1,6 @@
 import type {
+  EvalDatasetRunRequest,
+  EvalDatasetRunSummary,
   EvalRun,
   EvalRunResult,
   EvalRunResultsResponse,
@@ -47,7 +49,10 @@ export async function getLatestQualityGateRun(): Promise<QualityGateRunDetail | 
   }
 
   const runsPayload =
-    (await runsResponse.json()) as { runs: EvalRun[]; count: number };
+    (await runsResponse.json()) as {
+      runs: EvalRun[];
+      count: number;
+    };
 
   const latestRun = runsPayload.runs[0];
 
@@ -78,4 +83,38 @@ export async function getLatestQualityGateRun(): Promise<QualityGateRunDetail | 
     ...latestRun,
     results: resultsPayload.results,
   };
+}
+
+export async function runQualityGate(
+  datasetId: string,
+  payload: EvalDatasetRunRequest,
+  token?: string,
+): Promise<EvalDatasetRunSummary> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (token?.trim()) {
+    headers["X-CI-GATE-TOKEN"] = token.trim();
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/eval/datasets/${datasetId}/ci-gate`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await parseError(
+        response,
+        "Unable to run quality gate.",
+      ),
+    );
+  }
+
+  return (await response.json()) as EvalDatasetRunSummary;
 }
