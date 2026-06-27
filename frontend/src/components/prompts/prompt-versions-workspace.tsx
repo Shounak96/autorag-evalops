@@ -14,6 +14,7 @@ import {
   Pencil,
   Save,
   X,
+  Trash2,
 } from "lucide-react";
 
 import {
@@ -24,6 +25,7 @@ import type { SyntheticEvent } from "react";
 
 import {
   createPrompt,
+  deletePrompt,
   listPrompts,
   setDefaultPrompt,
   updatePrompt,
@@ -79,15 +81,18 @@ export function PromptVersionsWorkspace() {
   
   const [editingPromptId, setEditingPromptId] =
   useState<string | null>(null);
-const [savingPromptId, setSavingPromptId] =
+  const [savingPromptId, setSavingPromptId] =
   useState<string | null>(null);
 
-const [editPromptName, setEditPromptName] = useState("");
-const [editPromptDescription, setEditPromptDescription] =
+  const [editPromptName, setEditPromptName] = useState("");
+  const [editPromptDescription, setEditPromptDescription] =
   useState("");
-const [editSystemPrompt, setEditSystemPrompt] = useState("");
-const [editUserPromptTemplate, setEditUserPromptTemplate] =
+  const [editSystemPrompt, setEditSystemPrompt] = useState("");
+  const [editUserPromptTemplate, setEditUserPromptTemplate] =
   useState("");
+
+  const [deletingPromptId, setDeletingPromptId] =
+  useState<string | null>(null);
 
   async function refreshPrompts() {
     setLoading(true);
@@ -302,8 +307,39 @@ async function handleSavePrompt(promptId: string) {
   } finally {
     setSavingPromptId(null);
   }
-}
 
+}
+  async function handleDeletePrompt(prompt: PromptVersion) {
+  if (prompt.is_default) {
+    setError("Default prompt version cannot be deleted.");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Delete "${prompt.name}"? This cannot be undone.`,
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  setDeletingPromptId(prompt.id);
+  setError(null);
+  setSuccessMessage(null);
+
+  try {
+    await deletePrompt(prompt.id);
+
+    setSuccessMessage("Prompt version deleted successfully.");
+
+    const response = await listPrompts();
+    setPrompts(response.prompts);
+  } catch (requestError) {
+    setError(getErrorMessage(requestError));
+  } finally {
+    setDeletingPromptId(null);
+  }
+}
 
   return (
     <div className="mx-auto max-w-[1700px]">
@@ -559,6 +595,22 @@ async function handleSavePrompt(promptId: string) {
                         <Copy className="h-3.5 w-3.5" />
                       )}
                       Duplicate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePrompt(prompt)}
+                      disabled={
+                        prompt.is_default ||
+                        deletingPromptId === prompt.id
+                      }
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                    >
+                      {deletingPromptId === prompt.id ? (
+                        <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                      Delete
                     </button>
 
                     <button

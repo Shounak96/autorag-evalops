@@ -88,6 +88,16 @@ def get_default_prompt_version(db: Session) -> PromptVersion | None:
         .first()
     )
 
+def get_prompt_version_by_name(
+    db: Session,
+    name: str,
+) -> PromptVersion | None:
+    return (
+        db.query(PromptVersion)
+        .filter(PromptVersion.name == name.strip())
+        .first()
+    )
+
 
 def clear_default_prompt_versions(db: Session) -> None:
     prompts = (
@@ -110,6 +120,14 @@ def create_prompt_version(
     is_default: bool,
 ) -> PromptVersion:
     validate_prompt_template(user_prompt_template)
+
+    existing_prompt = get_prompt_version_by_name(
+        db=db,
+        name=name,
+    )
+
+    if existing_prompt:
+        raise ValueError("A prompt version with this name already exists")
 
     existing_prompt_count = db.query(PromptVersion).count()
 
@@ -141,6 +159,14 @@ def update_prompt_version(
     user_prompt_template: str,
 ) -> PromptVersion:
     validate_prompt_template(user_prompt_template)
+
+    existing_prompt = get_prompt_version_by_name(
+        db=db,
+        name=name,
+    )
+
+    if existing_prompt and existing_prompt.id != prompt.id:
+        raise ValueError("A prompt version with this name already exists")
 
     prompt.name = name.strip()
     prompt.description = (
@@ -219,3 +245,13 @@ def resolve_prompt_version(
         "user_prompt_template": BUILT_IN_USER_PROMPT_TEMPLATE,
         "source": "built_in_fallback",
     }
+
+def delete_prompt_version(
+    db: Session,
+    prompt: PromptVersion,
+) -> None:
+    if prompt.is_default:
+        raise ValueError("Default prompt version cannot be deleted")
+
+    db.delete(prompt)
+    db.commit()

@@ -16,6 +16,7 @@ from app.services.prompt_service import (
     serialize_prompt_version,
     set_default_prompt_version,
     update_prompt_version,
+    delete_prompt_version,
 )
 
 router = APIRouter(prefix="/prompts", tags=["Prompt Versions"])
@@ -156,3 +157,36 @@ def set_default_prompt(
         "message": "Default prompt version updated successfully",
         "prompt": serialize_prompt_version(updated_prompt),
     }
+
+@router.delete(
+    "/{prompt_version_id}",
+    status_code=204,
+)
+def delete_prompt(
+    prompt_version_id: str,
+    db: Session = Depends(get_db),
+):
+    prompt = get_prompt_version_by_id(
+        db=db,
+        prompt_version_id=prompt_version_id,
+    )
+
+    if not prompt:
+        raise HTTPException(
+            status_code=404,
+            detail="Prompt version not found",
+        )
+
+    try:
+        delete_prompt_version(
+            db=db,
+            prompt=prompt,
+        )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+
+    return None

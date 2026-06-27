@@ -120,3 +120,20 @@ export async function setDefaultPrompt(
   };
 }
 
+export async function deletePrompt(
+  promptVersionId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/prompts/${promptVersionId}`,
+    {
+      method: "DELETE",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await parseError(response, "Unable to delete prompt."),
+    );
+  }
+}
+
