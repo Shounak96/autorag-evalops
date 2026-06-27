@@ -10,6 +10,12 @@ class PromptVersionCreateRequest(BaseModel):
     user_prompt_template: str = Field(..., min_length=20)
     is_default: bool = False
 
+class PromptVersionUpdateRequest(BaseModel):
+    name: str = Field(..., min_length=3, max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
+    system_prompt: str = Field(..., min_length=20)
+    user_prompt_template: str = Field(..., min_length=20)
+
 
 class PromptVersionResponse(BaseModel):
     id: str

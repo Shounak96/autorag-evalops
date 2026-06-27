@@ -7,6 +7,7 @@ from app.schemas.prompt import (
     PromptVersionListResponse,
     PromptVersionResponse,
     SetDefaultPromptResponse,
+    PromptVersionUpdateRequest,
 )
 from app.services.prompt_service import (
     create_prompt_version,
@@ -14,6 +15,7 @@ from app.services.prompt_service import (
     get_prompt_versions,
     serialize_prompt_version,
     set_default_prompt_version,
+    update_prompt_version,
 )
 
 router = APIRouter(prefix="/prompts", tags=["Prompt Versions"])
@@ -85,6 +87,45 @@ def get_prompt(
         )
 
     return serialize_prompt_version(prompt)
+
+
+@router.patch(
+    "/{prompt_version_id}",
+    response_model=PromptVersionResponse,
+)
+def update_prompt(
+    prompt_version_id: str,
+    request: PromptVersionUpdateRequest,
+    db: Session = Depends(get_db),
+):
+    prompt = get_prompt_version_by_id(
+        db=db,
+        prompt_version_id=prompt_version_id,
+    )
+
+    if not prompt:
+        raise HTTPException(
+            status_code=404,
+            detail="Prompt version not found",
+        )
+
+    try:
+        updated_prompt = update_prompt_version(
+            db=db,
+            prompt=prompt,
+            name=request.name,
+            description=request.description,
+            system_prompt=request.system_prompt,
+            user_prompt_template=request.user_prompt_template,
+        )
+
+        return serialize_prompt_version(updated_prompt)
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
 
 
 @router.patch(

@@ -24,6 +24,22 @@ async function parseError(
   }
 }
 
+export interface CreatePromptPayload {
+  name: string;
+  description?: string | null;
+  system_prompt: string;
+  user_prompt_template: string;
+  is_default: boolean;
+}
+
+export interface UpdatePromptPayload {
+  name: string;
+  description?: string | null;
+  system_prompt: string;
+  user_prompt_template: string;
+}
+
+
 export async function listPrompts(): Promise<PromptListResponse> {
   const response = await fetch(`${API_BASE_URL}/prompts`, {
     cache: "no-store",
@@ -31,19 +47,60 @@ export async function listPrompts(): Promise<PromptListResponse> {
 
   if (!response.ok) {
     throw new Error(
-      await parseError(
-        response,
-        "Unable to load prompt versions.",
-      ),
+      await parseError(response, "Unable to load prompts."),
     );
   }
 
   return (await response.json()) as PromptListResponse;
 }
 
+export async function createPrompt(
+  payload: CreatePromptPayload,
+): Promise<PromptVersion> {
+  const response = await fetch(`${API_BASE_URL}/prompts`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await parseError(response, "Unable to create prompt."),
+    );
+  }
+
+  return (await response.json()) as PromptVersion;
+}
+
+export async function updatePrompt(
+  promptVersionId: string,
+  payload: UpdatePromptPayload,
+): Promise<PromptVersion> {
+  const response = await fetch(
+    `${API_BASE_URL}/prompts/${promptVersionId}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await parseError(response, "Unable to update prompt."),
+    );
+  }
+
+  return (await response.json()) as PromptVersion;
+}
+
 export async function setDefaultPrompt(
   promptVersionId: string,
-): Promise<PromptVersion> {
+): Promise<{ message: string; prompt: PromptVersion }> {
   const response = await fetch(
     `${API_BASE_URL}/prompts/${promptVersionId}/default`,
     {
@@ -53,12 +110,13 @@ export async function setDefaultPrompt(
 
   if (!response.ok) {
     throw new Error(
-      await parseError(
-        response,
-        "Unable to set default prompt.",
-      ),
+      await parseError(response, "Unable to set default prompt."),
     );
   }
 
-  return (await response.json()) as PromptVersion;
+  return (await response.json()) as {
+    message: string;
+    prompt: PromptVersion;
+  };
 }
+

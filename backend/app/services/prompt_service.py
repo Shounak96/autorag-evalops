@@ -132,6 +132,31 @@ def create_prompt_version(
 
     return prompt
 
+def update_prompt_version(
+    db: Session,
+    prompt: PromptVersion,
+    name: str,
+    description: str | None,
+    system_prompt: str,
+    user_prompt_template: str,
+) -> PromptVersion:
+    validate_prompt_template(user_prompt_template)
+
+    prompt.name = name.strip()
+    prompt.description = (
+        description.strip()
+        if description and description.strip()
+        else None
+    )
+    prompt.system_prompt = system_prompt.strip()
+    prompt.user_prompt_template = user_prompt_template.strip()
+
+    db.add(prompt)
+    db.commit()
+    db.refresh(prompt)
+
+    return prompt
+
 
 def set_default_prompt_version(
     db: Session,
