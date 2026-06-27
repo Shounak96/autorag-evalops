@@ -112,8 +112,56 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Run AutoRAG regression gate
+            - name: Run AutoRAG regression gate
         run: python scripts/run_ci_quality_gate.py
+
+      - name: Write quality-gate job summary
+        if: always()
+        shell: python
+        run: |
+          import json
+          import os
+          from pathlib import Path
+
+          report_path = Path("artifacts/ci-quality-gate-report.json")
+          summary_path = Path(os.environ["GITHUB_STEP_SUMMARY"])
+
+          if not report_path.exists():
+              summary_path.write_text(
+                  "## AutoRAG Quality Gate\n\n"
+                  "No quality-gate report was generated.\n",
+                  encoding="utf-8",
+              )
+              raise SystemExit(0)
+
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+
+          passed = bool(report.get("quality_gate_passed"))
+          status = "PASSED" if passed else "FAILED"
+
+          pass_rate = float(report.get("pass_rate", 0)) * 100
+          retrieval = float(report.get("avg_retrieval_score", 0))
+          grounding = float(report.get("avg_grounding_score", 0))
+          citations = float(report.get("avg_citation_coverage", 0)) * 100
+          latency = float(report.get("avg_latency_ms", 0))
+
+          summary = f"""## AutoRAG Quality Gate: {status}
+
+          | Metric | Value |
+          | --- | --- |
+          | Dataset | {report.get("dataset_name")} |
+          | Prompt | {report.get("prompt_version_name")} |
+          | Run ID | {report.get("rag_run_id")} |
+          | Passed cases | {report.get("passed_cases")}/{report.get("total_cases")} |
+          | Pass rate | {pass_rate:.1f}% |
+          | Avg retrieval score | {retrieval:.4f} |
+          | Avg grounding score | {grounding:.4f} |
+          | Avg citation coverage | {citations:.1f}% |
+          | Unsupported claims | {report.get("total_unsupported_claims")} |
+          | Avg latency | {latency:.2f} ms |
+          """
+
+          summary_path.write_text(summary, encoding="utf-8")
 
       - name: Upload quality-gate report
         if: always()
