@@ -102,6 +102,7 @@ jobs:
       AUTORAG_MIN_CITATION_COVERAGE: "1.0"
       AUTORAG_MIN_ANSWER_SCORE: "0.6"
       AUTORAG_MAX_UNSUPPORTED_CLAIMS: "0"
+      AUTORAG_MAX_AVG_LATENCY_MS: "15000"
 
     steps:
       - name: Check out repository

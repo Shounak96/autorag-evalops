@@ -429,6 +429,7 @@ def run_dataset_evaluation(
         and avg_grounding_score >= thresholds["min_grounding_score"]
         and avg_citation_coverage >= thresholds["min_citation_coverage"]
         and total_unsupported_claims <= thresholds["max_unsupported_claims"]
+        and avg_latency_ms <= thresholds["max_avg_latency_ms"]
     )
 
     aggregate_rag_run.status = "completed"

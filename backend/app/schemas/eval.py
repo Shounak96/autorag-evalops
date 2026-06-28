@@ -63,6 +63,7 @@ class QualityGateThresholds(BaseModel):
     min_citation_coverage: float = Field(default=1.0, ge=0.0, le=1.0)
     min_answer_score: float = Field(default=0.6, ge=0.0, le=1.0)
     max_unsupported_claims: int = Field(default=0, ge=0)
+    max_avg_latency_ms: float = Field(default=15000, ge=1)
 
 
 class EvalDatasetRunRequest(BaseModel):

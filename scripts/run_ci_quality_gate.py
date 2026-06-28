@@ -134,6 +134,10 @@ def main() -> None:
                 "AUTORAG_MAX_UNSUPPORTED_CLAIMS",
                 0,
             ),
+            "max_avg_latency_ms": read_float_env(
+                "AUTORAG_MAX_AVG_LATENCY_MS",
+                15000,
+            ),
         },
     }
 

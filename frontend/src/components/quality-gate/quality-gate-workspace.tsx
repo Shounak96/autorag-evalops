@@ -117,6 +117,7 @@ export function QualityGateWorkspace() {
     useState(0.6);
   const [maxUnsupportedClaims, setMaxUnsupportedClaims] =
     useState(0);
+  const [maxAvgLatencyMs, setMaxAvgLatencyMs] = useState(15000);
 
   const [ciGateToken, setCiGateToken] = useState("");
   const [runningGate, setRunningGate] = useState(false);
@@ -229,6 +230,7 @@ export function QualityGateWorkspace() {
             min_citation_coverage: minCitationCoverage,
             min_answer_score: minAnswerScore,
             max_unsupported_claims: maxUnsupportedClaims,
+            max_avg_latency_ms: maxAvgLatencyMs,
           },
         },
         ciGateToken,
@@ -445,6 +447,15 @@ export function QualityGateWorkspace() {
             max={10}
             step={1}
             onChange={setMaxUnsupportedClaims}
+          />
+
+          <NumberField
+            label="Max avg latency ms"
+            value={maxAvgLatencyMs}
+            min={1}
+            max={120000}
+            step={500}
+            onChange={setMaxAvgLatencyMs}
           />
         </div>
 

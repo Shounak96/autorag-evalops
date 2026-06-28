@@ -49,6 +49,7 @@ export interface QualityGateThresholds {
   min_citation_coverage: number;
   min_answer_score: number;
   max_unsupported_claims: number;
+  max_avg_latency_ms: number;
 }
 
 export interface EvalDatasetRunRequest {
