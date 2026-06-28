@@ -43,6 +43,7 @@ const DEFAULT_THRESHOLDS = {
   min_citation_coverage: 1.0,
   min_answer_score: 0.6,
   max_unsupported_claims: 0,
+  max_avg_latency_ms: 15000,
 };
 
 function formatDate(timestamp: string): string {
