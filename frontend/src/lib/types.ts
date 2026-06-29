@@ -120,6 +120,11 @@ export interface PromptListResponse {
 
 export interface EvalRun {
   rag_run_id: string;
+  source: string | null;
+  branch_name: string | null;
+  commit_sha: string | null;
+  trigger_type: string | null;
+  external_run_url: string | null;
   dataset_id: string | null;
   dataset_name: string | null;
   prompt_version_id: string | null;

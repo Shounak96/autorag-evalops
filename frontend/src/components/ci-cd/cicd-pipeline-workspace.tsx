@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clipboard,
-  Code2,
   FileJson,
   GitBranch,
   KeyRound,
@@ -12,8 +11,13 @@ import {
   ShieldCheck,
   Terminal,
   XCircle,
+  LoaderCircle,
+  RefreshCw,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+import { listCiCdRuns, splitRunsBySource } from "@/lib/ci-cd-api";
+import type { EvalRun } from "@/lib/types";
 
 const LOCAL_COMMAND = `python scripts\\run_ci_quality_gate.py`;
 
@@ -78,10 +82,69 @@ function copyToClipboard(
   }, 2200);
 }
 
+function formatPercentage(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatLatency(value: number): string {
+  if (value < 1000) {
+    return `${value.toFixed(0)} ms`;
+  }
+
+  return `${(value / 1000).toFixed(2)} s`;
+}
+
+function formatDate(timestamp: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(timestamp));
+}
+
+function shortCommit(commitSha: string | null): string {
+  if (!commitSha) {
+    return "Not available";
+  }
+
+  return commitSha.slice(0, 7);
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : "An unexpected error occurred.";
+}
+
 export function CICDPipelineWorkspace() {
   const [copiedLabel, setCopiedLabel] = useState<string | null>(
     null,
   );
+
+const [runs, setRuns] = useState<EvalRun[]>([]);
+const [loadingRuns, setLoadingRuns] = useState(true);
+const [runsError, setRunsError] = useState<string | null>(null);
+
+async function refreshRuns() {
+  setLoadingRuns(true);
+  setRunsError(null);
+
+  try {
+    const response = await listCiCdRuns(50);
+    setRuns(response);
+  } catch (requestError) {
+    setRunsError(getErrorMessage(requestError));
+  } finally {
+    setLoadingRuns(false);
+  }
+}
+
+useEffect(() => {
+  refreshRuns();
+}, []);
+
+const { ciRuns, manualRuns } = splitRunsBySource(runs);
+const latestCiRun = ciRuns[0] ?? null;
+const latestAnyRun = runs[0] ?? null;
 
   return (
     <div className="mx-auto max-w-[1700px]">
@@ -109,6 +172,101 @@ export function CICDPipelineWorkspace() {
           </div>
         )}
       </section>
+
+      <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
+          <div>
+            <p className="text-sm font-semibold text-indigo-600">
+              Live CI/CD Monitoring
+            </p>
+
+            <h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+              Pipeline run history
+            </h3>
+
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+              Track manual quality-gate runs and automated GitHub Actions
+              runs using the same evaluation history endpoint.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={refreshRuns}
+            disabled={loadingRuns}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+          >
+            {loadingRuns ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Refresh runs
+          </button>
+        </div>
+
+        {runsError && (
+          <div className="mt-5 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-700">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            {runsError}
+          </div>
+        )}
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            label="Total runs"
+            value={String(runs.length)}
+            helper="Manual and CI quality-gate runs"
+            icon={FileJson}
+          />
+
+          <MetricCard
+            label="CI runs"
+            value={String(ciRuns.length)}
+            helper="Runs triggered by GitHub Actions"
+            icon={GitBranch}
+          />
+
+          <MetricCard
+            label="Manual runs"
+            value={String(manualRuns.length)}
+            helper="Runs triggered from AutoRAG UI"
+            icon={Terminal}
+          />
+
+          <MetricCard
+            label="Latest status"
+            value={
+              latestAnyRun
+                ? latestAnyRun.quality_gate_passed
+                  ? "Passed"
+                  : "Failed"
+                : "No runs"
+            }
+            helper={
+              latestAnyRun
+                ? `${latestAnyRun.passed_cases}/${latestAnyRun.total_cases} cases passed`
+                : "No evaluation history yet"
+            }
+            icon={latestAnyRun?.quality_gate_passed ? CheckCircle2 : XCircle}
+          />
+        </div>
+
+        <div className="mt-6 grid gap-6 xl:grid-cols-2">
+          <RunHistoryPanel
+            title="Latest automated CI run"
+            emptyText="No GitHub Actions CI runs have been recorded yet. After backend deployment and repository variables are configured, CI runs will appear here."
+            run={latestCiRun}
+          />
+
+          <RunHistoryPanel
+            title="Latest manual gate run"
+            emptyText="No manual quality-gate runs found."
+            run={manualRuns[0] ?? null}
+          />
+        </div>
+      </section>
+
 
       <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
@@ -491,6 +649,124 @@ function DecisionState({
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface RunHistoryPanelProps {
+  title: string;
+  emptyText: string;
+  run: EvalRun | null;
+}
+
+function RunHistoryPanel({
+  title,
+  emptyText,
+  run,
+}: RunHistoryPanelProps) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-semibold text-slate-950">
+          {title}
+        </h3>
+
+        {run && (
+          <span
+            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+              run.quality_gate_passed
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-rose-200 bg-rose-50 text-rose-700"
+            }`}
+          >
+            {run.quality_gate_passed ? "Passed" : "Failed"}
+          </span>
+        )}
+      </div>
+
+      {!run ? (
+        <p className="mt-4 text-sm leading-6 text-slate-500">
+          {emptyText}
+        </p>
+      ) : (
+        <div className="mt-4 space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-slate-950">
+              {run.dataset_name ?? "Unknown dataset"}
+            </p>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Prompt: {run.prompt_version_name ?? "Default prompt"}
+            </p>
+
+            <p className="mt-1 font-mono text-[11px] text-slate-400">
+              Run ID: {run.rag_run_id}
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <RunMeta label="Source" value={run.source ?? "manual"} />
+            <RunMeta label="Trigger" value={run.trigger_type ?? "manual"} />
+            <RunMeta label="Branch" value={run.branch_name ?? "Not available"} />
+            <RunMeta label="Commit" value={shortCommit(run.commit_sha)} />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <RunMeta
+              label="Pass rate"
+              value={formatPercentage(run.pass_rate)}
+            />
+
+            <RunMeta
+              label="Grounding"
+              value={formatPercentage(run.avg_grounding_score)}
+            />
+
+            <RunMeta
+              label="Latency"
+              value={formatLatency(run.avg_latency_ms)}
+            />
+          </div>
+
+          <p className="text-xs leading-5 text-slate-500">
+            Created {formatDate(run.created_at)}
+          </p>
+
+          {run.external_run_url && (
+            <a
+              href={run.external_run_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+            >
+              <Rocket className="h-3.5 w-3.5" />
+              Open GitHub Actions run
+            </a>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+interface RunMetaProps {
+  label: string;
+  value: string;
+}
+
+function RunMeta({
+  label,
+  value,
+}: RunMetaProps) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+
+      <p className="mt-1 break-all text-xs font-semibold text-slate-800">
+        {value}
+      </p>
     </div>
   );
 }
