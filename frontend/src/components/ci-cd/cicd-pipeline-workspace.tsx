@@ -17,7 +17,9 @@ import {
 import { useEffect, useState } from "react";
 
 import { listCiCdRuns, splitRunsBySource } from "@/lib/ci-cd-api";
-import type { EvalRun } from "@/lib/types";
+import type { EvalDataset, EvalRun, PromptVersion } from "@/lib/types";
+import { listDatasets } from "@/lib/datasets-api";
+import { listPrompts } from "@/lib/prompts-api";
 
 const LOCAL_COMMAND = `python scripts\\run_ci_quality_gate.py`;
 
@@ -123,6 +125,10 @@ export function CICDPipelineWorkspace() {
 const [runs, setRuns] = useState<EvalRun[]>([]);
 const [loadingRuns, setLoadingRuns] = useState(true);
 const [runsError, setRunsError] = useState<string | null>(null);
+const [datasets, setDatasets] = useState<EvalDataset[]>([]);
+const [prompts, setPrompts] = useState<PromptVersion[]>([]);
+const [selectedDatasetId, setSelectedDatasetId] = useState("");
+const [selectedPromptId, setSelectedPromptId] = useState("");
 
 async function refreshRuns() {
   setLoadingRuns(true);
@@ -131,20 +137,56 @@ async function refreshRuns() {
   try {
     const response = await listCiCdRuns(50);
     setRuns(response);
-  } catch (requestError) {
-    setRunsError(getErrorMessage(requestError));
-  } finally {
-    setLoadingRuns(false);
+    const [datasetsResponse, promptsResponse] = await Promise.all([
+    listDatasets(),
+    listPrompts(),
+  ]);
+
+  setDatasets(datasetsResponse.datasets);
+  setPrompts(promptsResponse.prompts);
+
+  setSelectedDatasetId((currentValue) =>
+    currentValue || datasetsResponse.datasets[0]?.id || "",
+  );
+
+  const defaultPrompt =
+    promptsResponse.prompts.find((prompt) => prompt.is_default) ??
+    promptsResponse.prompts[0];
+
+  setSelectedPromptId((currentValue) =>
+    currentValue || defaultPrompt?.id || "",
+  );
+    } catch (requestError) {
+      setRunsError(getErrorMessage(requestError));
+    } finally {
+      setLoadingRuns(false);
+    }
   }
-}
 
-useEffect(() => {
-  refreshRuns();
-}, []);
+  useEffect(() => {
+    refreshRuns();
+  }, []);
 
-const { ciRuns, manualRuns } = splitRunsBySource(runs);
-const latestCiRun = ciRuns[0] ?? null;
-const latestAnyRun = runs[0] ?? null;
+  const { ciRuns, manualRuns } = splitRunsBySource(runs);
+  const latestCiRun = ciRuns[0] ?? null;
+  const latestAnyRun = runs[0] ?? null;
+  const selectedDataset = datasets.find(
+  (dataset) => dataset.id === selectedDatasetId,
+  );
+
+  const selectedPrompt = prompts.find(
+    (prompt) => prompt.id === selectedPromptId,
+  );
+
+  const githubVariables = `AUTORAG_API_BASE_URL=<your-deployed-backend-url>
+  AUTORAG_DATASET_ID=${selectedDatasetId || "<select-a-dataset>"}
+  AUTORAG_PROMPT_VERSION_ID=${selectedPromptId || "<select-a-prompt>"}`;
+
+  const localEnvironment = `$env:AUTORAG_API_BASE_URL = "http://127.0.0.1:8000"
+  $env:AUTORAG_DATASET_ID = "${selectedDatasetId || "<select-a-dataset>"}"
+  $env:AUTORAG_PROMPT_VERSION_ID = "${selectedPromptId || "<select-a-prompt>"}"
+  $env:AUTORAG_USE_QUERY_REWRITE = "false"
+  $env:AUTORAG_CI_GATE_TOKEN = "your-local-token"`;
 
   return (
     <div className="mx-auto max-w-[1700px]">
@@ -264,6 +306,91 @@ const latestAnyRun = runs[0] ?? null;
             emptyText="No manual quality-gate runs found."
             run={manualRuns[0] ?? null}
           />
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
+          <div>
+            <p className="text-sm font-semibold text-indigo-600">
+              CI/CD Configuration Helper
+            </p>
+
+            <h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+              Generate setup values
+            </h3>
+
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+              Select the dataset and prompt version that GitHub Actions
+              should use for automated RAG quality checks.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <SelectField
+            label="Regression dataset"
+            value={selectedDatasetId}
+            onChange={setSelectedDatasetId}
+            options={datasets.map((dataset) => ({
+              value: dataset.id,
+              label: `${dataset.name} (${dataset.test_case_count} cases)`,
+            }))}
+          />
+
+          <SelectField
+            label="Prompt version"
+            value={selectedPromptId}
+            onChange={setSelectedPromptId}
+            options={prompts.map((prompt) => ({
+              value: prompt.id,
+              label: `${prompt.name}${prompt.is_default ? " — default" : ""}`,
+            }))}
+          />
+        </div>
+
+        <div className="mt-5 grid gap-4 xl:grid-cols-2">
+          <CodePanel
+            title="GitHub repository variables"
+            description="Add these in GitHub → Settings → Secrets and variables → Actions → Variables."
+            code={githubVariables}
+            copyLabel="GitHub variables"
+            onCopy={() =>
+              copyToClipboard(
+                githubVariables,
+                setCopiedLabel,
+                "GitHub variables",
+              )
+            }
+          />
+
+          <CodePanel
+            title="Local PowerShell environment"
+            description="Use these values to test the CI runner locally while FastAPI is running."
+            code={localEnvironment}
+            copyLabel="Local environment"
+            onCopy={() =>
+              copyToClipboard(
+                localEnvironment,
+                setCopiedLabel,
+                "Local environment",
+              )
+            }
+          />
+        </div>
+
+        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            Selected CI target
+          </p>
+
+          <p className="mt-2 text-sm font-semibold text-slate-950">
+            Dataset: {selectedDataset?.name ?? "Not selected"}
+          </p>
+
+          <p className="mt-1 text-sm text-slate-600">
+            Prompt: {selectedPrompt?.name ?? "Not selected"}
+          </p>
         </div>
       </section>
 
@@ -768,5 +895,47 @@ function RunMeta({
         {value}
       </p>
     </div>
+  );
+}
+
+interface SelectFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{
+    value: string;
+    label: string;
+  }>;
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+}: SelectFieldProps) {
+  return (
+    <label className="block">
+      <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </span>
+
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+      >
+        <option value="">Select {label.toLowerCase()}</option>
+
+        {options.map((option) => (
+          <option
+            key={option.value}
+            value={option.value}
+          >
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
