@@ -36,6 +36,32 @@ class RagRun(Base):
         default="running",
     )
 
+    source: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="manual",
+    )
+
+    branch_name: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    commit_sha: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    trigger_type: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    external_run_url: Mapped[str | None] = mapped_column(
+        String(1000),
+        nullable=True,
+    )
+
     total_cases: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     passed_cases: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     failed_cases: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

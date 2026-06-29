@@ -241,6 +241,11 @@ def run_dataset(
             max_rewritten_queries=request.max_rewritten_queries,
             prompt_version_id=request.prompt_version_id,
             thresholds=request.thresholds.model_dump(),
+            source=request.source,
+            branch_name=request.branch_name,
+            commit_sha=request.commit_sha,
+            trigger_type=request.trigger_type,
+            external_run_url=request.external_run_url,
         )
 
     except ValueError as error:
@@ -537,6 +542,11 @@ def run_ci_quality_gate(
             max_rewritten_queries=request.max_rewritten_queries,
             prompt_version_id=request.prompt_version_id,
             thresholds=request.thresholds.model_dump(),
+            source=request.source,
+            branch_name=request.branch_name,
+            commit_sha=request.commit_sha,
+            trigger_type=request.trigger_type,
+            external_run_url=request.external_run_url,
         )
 
     except ValueError as error:

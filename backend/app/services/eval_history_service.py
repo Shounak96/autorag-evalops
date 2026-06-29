@@ -89,6 +89,11 @@ def serialize_run(
 
     response = {
         "rag_run_id": rag_run.id,
+        "source": rag_run.source,
+        "branch_name": rag_run.branch_name,
+        "commit_sha": rag_run.commit_sha,
+        "trigger_type": rag_run.trigger_type,
+        "external_run_url": rag_run.external_run_url,
         "dataset_id": rag_run.dataset_id,
         "dataset_name": dataset_name,
         "prompt_version_id": rag_run.prompt_version_id,

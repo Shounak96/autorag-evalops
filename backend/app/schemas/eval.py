@@ -76,6 +76,11 @@ class EvalDatasetRunRequest(BaseModel):
     thresholds: QualityGateThresholds = Field(
         default_factory=QualityGateThresholds
     )
+    source: str = Field(default="manual", max_length=50)
+    branch_name: str | None = Field(default=None, max_length=255)
+    commit_sha: str | None = Field(default=None, max_length=255)
+    trigger_type: str | None = Field(default=None, max_length=100)
+    external_run_url: str | None = Field(default=None, max_length=1000)
 
 
 class EvalCaseRunResponse(BaseModel):
@@ -117,6 +122,11 @@ class EvalDatasetRunSummary(BaseModel):
     avg_latency_ms: float
     thresholds: QualityGateThresholds
     results: list[EvalCaseRunResponse]
+    source: str | None = None
+    branch_name: str | None = None
+    commit_sha: str | None = None
+    trigger_type: str | None = None
+    external_run_url: str | None = None
 
 
 class PromptComparisonRequest(BaseModel):
@@ -174,6 +184,11 @@ class EvalRunResultHistoryItem(BaseModel):
 
 class EvalRunHistoryItem(BaseModel):
     rag_run_id: str
+    source: str | None = None
+    branch_name: str | None = None
+    commit_sha: str | None = None
+    trigger_type: str | None = None
+    external_run_url: str | None = None
     dataset_id: str | None
     dataset_name: str | None
     prompt_version_id: str | None

@@ -153,6 +153,11 @@ def create_dataset_rag_run(
     db: Session,
     dataset: EvalDataset,
     prompt_version_id: str | None,
+    source: str = "manual",
+    branch_name: str | None = None,
+    commit_sha: str | None = None,
+    trigger_type: str | None = None,
+    external_run_url: str | None = None,
 ) -> RagRun:
     rag_run = RagRun(
         dataset_id=dataset.id,
@@ -162,6 +167,11 @@ def create_dataset_rag_run(
         passed_cases=0,
         failed_cases=0,
         notes=f"Dataset evaluation run: {dataset.name}",
+        source=source,
+        branch_name=branch_name,
+        commit_sha=commit_sha,
+        trigger_type=trigger_type,
+        external_run_url=external_run_url,
     )
 
     db.add(rag_run)
@@ -324,6 +334,11 @@ def run_dataset_evaluation(
     max_rewritten_queries: int,
     prompt_version_id: str | None,
     thresholds: dict,
+    source: str = "manual",
+    branch_name: str | None = None,
+    commit_sha: str | None = None,
+    trigger_type: str | None = None,
+    external_run_url: str | None = None,
 ) -> dict:
     test_cases = list(dataset.test_cases)
 
@@ -336,10 +351,15 @@ def run_dataset_evaluation(
     )
 
     aggregate_rag_run = create_dataset_rag_run(
-        db=db,
-        dataset=dataset,
-        prompt_version_id=selected_prompt["id"],
-    )
+    db=db,
+    dataset=dataset,
+    prompt_version_id=selected_prompt["id"],
+    source=source,
+    branch_name=branch_name,
+    commit_sha=commit_sha,
+    trigger_type=trigger_type,
+    external_run_url=external_run_url,
+)
 
     case_results: list[dict] = []
 
@@ -454,6 +474,11 @@ def run_dataset_evaluation(
 
     return {
         "rag_run_id": aggregate_rag_run.id,
+        "source": aggregate_rag_run.source,
+        "branch_name": aggregate_rag_run.branch_name,
+        "commit_sha": aggregate_rag_run.commit_sha,
+        "trigger_type": aggregate_rag_run.trigger_type,
+        "external_run_url": aggregate_rag_run.external_run_url,
         "dataset_id": dataset.id,
         "dataset_name": dataset.name,
         "prompt_version_id": selected_prompt["id"],

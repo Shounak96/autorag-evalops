@@ -139,6 +139,20 @@ def main() -> None:
                 15000,
             ),
         },
+
+        "source": "ci",
+        "branch_name": os.getenv("GITHUB_REF_NAME"),
+        "commit_sha": os.getenv("GITHUB_SHA"),
+        "trigger_type": os.getenv("GITHUB_EVENT_NAME"),
+        "external_run_url": (
+            f"{os.getenv('GITHUB_SERVER_URL')}/"
+            f"{os.getenv('GITHUB_REPOSITORY')}/actions/runs/"
+            f"{os.getenv('GITHUB_RUN_ID')}"
+            if os.getenv("GITHUB_SERVER_URL")
+            and os.getenv("GITHUB_REPOSITORY")
+            and os.getenv("GITHUB_RUN_ID")
+            else None
+        ),
     }
 
     endpoint = (
