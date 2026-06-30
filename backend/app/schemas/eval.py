@@ -64,6 +64,12 @@ class QualityGateThresholds(BaseModel):
     min_answer_score: float = Field(default=0.6, ge=0.0, le=1.0)
     max_unsupported_claims: int = Field(default=0, ge=0)
     max_avg_latency_ms: float = Field(default=15000, ge=1)
+    baseline_run_id: str | None = None
+    max_pass_rate_drop: float = Field(default=0.1, ge=0.0, le=1.0)
+    max_answer_score_drop: float = Field(default=0.15, ge=0.0, le=1.0)
+    max_retrieval_score_drop: float = Field(default=0.15, ge=0.0, le=1.0)
+    max_grounding_score_drop: float = Field(default=0.1, ge=0.0, le=1.0)
+    max_citation_coverage_drop: float = Field(default=0.1, ge=0.0, le=1.0)
 
 
 class EvalDatasetRunRequest(BaseModel):

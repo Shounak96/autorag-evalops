@@ -50,6 +50,12 @@ export interface QualityGateThresholds {
   min_answer_score: number;
   max_unsupported_claims: number;
   max_avg_latency_ms: number;
+  baseline_run_id?: string | null;
+  max_pass_rate_drop: number;
+  max_answer_score_drop: number;
+  max_retrieval_score_drop: number;
+  max_grounding_score_drop: number;
+  max_citation_coverage_drop: number;
 }
 
 export interface EvalDatasetRunRequest {

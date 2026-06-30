@@ -164,8 +164,56 @@ async function refreshRuns() {
   }
 
   useEffect(() => {
-    refreshRuns();
-  }, []);
+  let cancelled = false;
+
+  async function loadInitialRuns() {
+    setLoadingRuns(true);
+    setRunsError(null);
+
+    try {
+      const response = await listCiCdRuns(50);
+
+      const [datasetsResponse, promptsResponse] = await Promise.all([
+        listDatasets(),
+        listPrompts(),
+      ]);
+
+      if (cancelled) {
+        return;
+      }
+
+      setRuns(response);
+      setDatasets(datasetsResponse.datasets);
+      setPrompts(promptsResponse.prompts);
+
+      setSelectedDatasetId((currentValue) =>
+        currentValue || datasetsResponse.datasets[0]?.id || "",
+      );
+
+      const defaultPrompt =
+        promptsResponse.prompts.find((prompt) => prompt.is_default) ??
+        promptsResponse.prompts[0];
+
+      setSelectedPromptId((currentValue) =>
+        currentValue || defaultPrompt?.id || "",
+      );
+    } catch (requestError) {
+      if (!cancelled) {
+        setRunsError(getErrorMessage(requestError));
+      }
+    } finally {
+      if (!cancelled) {
+        setLoadingRuns(false);
+      }
+    }
+  }
+
+  loadInitialRuns();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
 
   const { ciRuns, manualRuns } = splitRunsBySource(runs);
   const latestCiRun = ciRuns[0] ?? null;

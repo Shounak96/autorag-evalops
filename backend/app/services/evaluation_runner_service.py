@@ -148,6 +148,64 @@ def build_failure_reasons(
 
     return failure_reasons
 
+def build_baseline_failure_reasons(
+    baseline_run: RagRun | None,
+    pass_rate: float,
+    avg_answer_score: float,
+    avg_retrieval_score: float,
+    avg_grounding_score: float,
+    avg_citation_coverage: float,
+    thresholds: dict,
+) -> list[str]:
+    if not baseline_run:
+        return []
+
+    failure_reasons: list[str] = []
+
+    max_pass_rate_drop = thresholds.get("max_pass_rate_drop", 0.1)
+    max_answer_score_drop = thresholds.get("max_answer_score_drop", 0.15)
+    max_retrieval_score_drop = thresholds.get(
+        "max_retrieval_score_drop",
+        0.15,
+    )
+    max_grounding_score_drop = thresholds.get(
+        "max_grounding_score_drop",
+        0.1,
+    )
+    max_citation_coverage_drop = thresholds.get(
+        "max_citation_coverage_drop",
+        0.1,
+    )
+
+    if baseline_run.pass_rate - pass_rate > max_pass_rate_drop:
+        failure_reasons.append(
+            "Pass rate dropped beyond the allowed baseline tolerance."
+        )
+
+    if baseline_run.avg_retrieval_score - avg_retrieval_score > max_retrieval_score_drop:
+        failure_reasons.append(
+            "Retrieval score dropped beyond the allowed baseline tolerance."
+        )
+
+    if baseline_run.avg_grounding_score - avg_grounding_score > max_grounding_score_drop:
+        failure_reasons.append(
+            "Grounding score dropped beyond the allowed baseline tolerance."
+        )
+
+    if baseline_run.avg_citation_coverage - avg_citation_coverage > max_citation_coverage_drop:
+        failure_reasons.append(
+            "Citation coverage dropped beyond the allowed baseline tolerance."
+        )
+
+    baseline_answer_score = 1.0
+
+    if baseline_answer_score - avg_answer_score > max_answer_score_drop:
+        failure_reasons.append(
+            "Answer score dropped beyond the allowed baseline tolerance."
+        )
+
+    return failure_reasons
+
 
 def create_dataset_rag_run(
     db: Session,
@@ -350,6 +408,19 @@ def run_dataset_evaluation(
         prompt_version_id=prompt_version_id,
     )
 
+    baseline_run_id = thresholds.get("baseline_run_id")
+    baseline_run: RagRun | None = None
+
+    if baseline_run_id:
+        baseline_run = (
+            db.query(RagRun)
+            .filter(RagRun.id == baseline_run_id)
+            .first()
+        )
+
+        if not baseline_run:
+            raise ValueError("Baseline evaluation run not found")
+
     aggregate_rag_run = create_dataset_rag_run(
     db=db,
     dataset=dataset,
@@ -443,6 +514,16 @@ def run_dataset_evaluation(
         for result in case_results
     ) / total_cases
 
+    baseline_failure_reasons = build_baseline_failure_reasons(
+        baseline_run=baseline_run,
+        pass_rate=pass_rate,
+        avg_answer_score=avg_answer_score,
+        avg_retrieval_score=avg_retrieval_score,
+        avg_grounding_score=avg_grounding_score,
+        avg_citation_coverage=avg_citation_coverage,
+        thresholds=thresholds,
+    )
+
     quality_gate_passed = (
         pass_rate >= thresholds["min_pass_rate"]
         and avg_retrieval_score >= thresholds["min_retrieval_score"]
@@ -450,6 +531,7 @@ def run_dataset_evaluation(
         and avg_citation_coverage >= thresholds["min_citation_coverage"]
         and total_unsupported_claims <= thresholds["max_unsupported_claims"]
         and avg_latency_ms <= thresholds["max_avg_latency_ms"]
+        and not baseline_failure_reasons
     )
 
     aggregate_rag_run.status = "completed"
@@ -497,6 +579,8 @@ def run_dataset_evaluation(
         "avg_latency_ms": round(avg_latency_ms, 2),
         "thresholds": thresholds,
         "results": case_results,
+        "baseline_run_id": baseline_run.id if baseline_run else None,
+        "baseline_failure_reasons": baseline_failure_reasons,
     }
 
 

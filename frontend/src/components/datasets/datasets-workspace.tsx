@@ -44,6 +44,12 @@ const DEFAULT_THRESHOLDS = {
   min_answer_score: 0.6,
   max_unsupported_claims: 0,
   max_avg_latency_ms: 15000,
+  baseline_run_id: null,
+  max_pass_rate_drop: 0.1,
+  max_answer_score_drop: 0.15,
+  max_retrieval_score_drop: 0.15,
+  max_grounding_score_drop: 0.1,
+  max_citation_coverage_drop: 0.1,
 };
 
 function formatDate(timestamp: string): string {
