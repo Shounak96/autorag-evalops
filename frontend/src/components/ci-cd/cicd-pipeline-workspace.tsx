@@ -129,6 +129,19 @@ const [datasets, setDatasets] = useState<EvalDataset[]>([]);
 const [prompts, setPrompts] = useState<PromptVersion[]>([]);
 const [selectedDatasetId, setSelectedDatasetId] = useState("");
 const [selectedPromptId, setSelectedPromptId] = useState("");
+const [selectedBaselineRunId, setSelectedBaselineRunId] =
+  useState("");
+const [maxPassRateDrop, setMaxPassRateDrop] = useState(0.1);
+const [maxAnswerScoreDrop, setMaxAnswerScoreDrop] =
+  useState(0.15);
+const [maxRetrievalScoreDrop, setMaxRetrievalScoreDrop] =
+  useState(0.15);
+const [maxGroundingScoreDrop, setMaxGroundingScoreDrop] =
+  useState(0.1);
+const [
+  maxCitationCoverageDrop,
+  setMaxCitationCoverageDrop,
+] = useState(0.1);
 
 async function refreshRuns() {
   setLoadingRuns(true);
@@ -218,6 +231,12 @@ async function refreshRuns() {
   const { ciRuns, manualRuns } = splitRunsBySource(runs);
   const latestCiRun = ciRuns[0] ?? null;
   const latestAnyRun = runs[0] ?? null;
+
+  const baselineRuns = runs.filter(
+    (run) =>
+      run.status === "completed" &&
+      run.quality_gate_passed,
+  );
   const selectedDataset = datasets.find(
   (dataset) => dataset.id === selectedDatasetId,
   );
@@ -228,11 +247,23 @@ async function refreshRuns() {
 
   const githubVariables = `AUTORAG_API_BASE_URL=<your-deployed-backend-url>
   AUTORAG_DATASET_ID=${selectedDatasetId || "<select-a-dataset>"}
-  AUTORAG_PROMPT_VERSION_ID=${selectedPromptId || "<select-a-prompt>"}`;
+  AUTORAG_PROMPT_VERSION_ID=${selectedPromptId || "<select-a-prompt>"}
+  AUTORAG_BASELINE_RUN_ID=${selectedBaselineRunId || ""}
+  AUTORAG_MAX_PASS_RATE_DROP=${maxPassRateDrop}
+  AUTORAG_MAX_ANSWER_SCORE_DROP=${maxAnswerScoreDrop}
+  AUTORAG_MAX_RETRIEVAL_SCORE_DROP=${maxRetrievalScoreDrop}
+  AUTORAG_MAX_GROUNDING_SCORE_DROP=${maxGroundingScoreDrop}
+  AUTORAG_MAX_CITATION_COVERAGE_DROP=${maxCitationCoverageDrop}`;
 
   const localEnvironment = `$env:AUTORAG_API_BASE_URL = "http://127.0.0.1:8000"
   $env:AUTORAG_DATASET_ID = "${selectedDatasetId || "<select-a-dataset>"}"
   $env:AUTORAG_PROMPT_VERSION_ID = "${selectedPromptId || "<select-a-prompt>"}"
+  $env:AUTORAG_BASELINE_RUN_ID = "${selectedBaselineRunId}"
+  $env:AUTORAG_MAX_PASS_RATE_DROP = "${maxPassRateDrop}"
+  $env:AUTORAG_MAX_ANSWER_SCORE_DROP = "${maxAnswerScoreDrop}"
+  $env:AUTORAG_MAX_RETRIEVAL_SCORE_DROP = "${maxRetrievalScoreDrop}"
+  $env:AUTORAG_MAX_GROUNDING_SCORE_DROP = "${maxGroundingScoreDrop}"
+  $env:AUTORAG_MAX_CITATION_COVERAGE_DROP = "${maxCitationCoverageDrop}"
   $env:AUTORAG_USE_QUERY_REWRITE = "false"
   $env:AUTORAG_CI_GATE_TOKEN = "your-local-token"`;
 
@@ -395,6 +426,84 @@ async function refreshRuns() {
               label: `${prompt.name}${prompt.is_default ? " — default" : ""}`,
             }))}
           />
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div>
+            <p className="text-sm font-semibold text-slate-950">
+              Baseline regression settings
+            </p>
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Optional: choose a passing run as the baseline for automated
+              CI checks. If the new run drops too far below this baseline,
+              GitHub Actions will block the release.
+            </p>
+          </div>
+
+          <div className="mt-4">
+            <SelectField
+              label="Baseline run"
+              value={selectedBaselineRunId}
+              onChange={setSelectedBaselineRunId}
+              options={baselineRuns.map((run) => ({
+                value: run.rag_run_id,
+                label: `${run.dataset_name ?? "Unknown dataset"} · ${(
+                  run.pass_rate * 100
+                ).toFixed(1)}% pass · ${new Intl.DateTimeFormat("en-US", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                }).format(new Date(run.created_at))}`,
+              }))}
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-5">
+            <NumberField
+              label="Max pass drop"
+              value={maxPassRateDrop}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={setMaxPassRateDrop}
+            />
+
+            <NumberField
+              label="Max answer drop"
+              value={maxAnswerScoreDrop}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={setMaxAnswerScoreDrop}
+            />
+
+            <NumberField
+              label="Max retrieval drop"
+              value={maxRetrievalScoreDrop}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={setMaxRetrievalScoreDrop}
+            />
+
+            <NumberField
+              label="Max grounding drop"
+              value={maxGroundingScoreDrop}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={setMaxGroundingScoreDrop}
+            />
+
+            <NumberField
+              label="Max citation drop"
+              value={maxCitationCoverageDrop}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={setMaxCitationCoverageDrop}
+            />
+          </div>
         </div>
 
         <div className="mt-5 grid gap-4 xl:grid-cols-2">
@@ -984,6 +1093,44 @@ function SelectField({
           </option>
         ))}
       </select>
+    </label>
+  );
+}
+
+interface NumberFieldProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+}
+
+function NumberField({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: NumberFieldProps) {
+  return (
+    <label className="block">
+      <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </span>
+
+      <input
+        type="number"
+        value={value}
+        min={min}
+        max={max}
+        step={step}
+        onChange={(event) =>
+          onChange(Number(event.target.value))
+        }
+        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+      />
     </label>
   );
 }

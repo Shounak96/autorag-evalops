@@ -138,7 +138,31 @@ def main() -> None:
                 "AUTORAG_MAX_AVG_LATENCY_MS",
                 15000,
             ),
-        },
+            "baseline_run_id": os.getenv(
+            "AUTORAG_BASELINE_RUN_ID",
+            "",
+            ).strip() or None,
+            "max_pass_rate_drop": read_float_env(
+                "AUTORAG_MAX_PASS_RATE_DROP",
+                0.1,
+            ),
+            "max_answer_score_drop": read_float_env(
+                "AUTORAG_MAX_ANSWER_SCORE_DROP",
+                0.15,
+            ),
+            "max_retrieval_score_drop": read_float_env(
+                "AUTORAG_MAX_RETRIEVAL_SCORE_DROP",
+                0.15,
+            ),
+            "max_grounding_score_drop": read_float_env(
+                "AUTORAG_MAX_GROUNDING_SCORE_DROP",
+                0.1,
+            ),
+            "max_citation_coverage_drop": read_float_env(
+                "AUTORAG_MAX_CITATION_COVERAGE_DROP",
+                0.1,
+            ),
+            },
 
         "source": "ci",
         "branch_name": os.getenv("GITHUB_REF_NAME"),
