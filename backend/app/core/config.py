@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"
     GEMINI_REWRITE_MODEL: str = "gemini-2.0-flash"
+    GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
+    EMBEDDING_PROVIDER: str = "local"
     ENABLE_LLM_QUERY_REWRITE: bool = True
     CI_GATE_TOKEN: str = ""
 
