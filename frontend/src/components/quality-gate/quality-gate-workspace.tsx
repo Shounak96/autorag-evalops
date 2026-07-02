@@ -1,38 +1,16 @@
 "use client";
 
-import {
-  AlertCircle,
-  CheckCircle2,
-  Clock3,
-  FileCheck2,
-  Gauge,
-  LoaderCircle,
-  RefreshCw,
-  Rocket,
-  ShieldAlert,
-  ShieldCheck,
-  XCircle,
+import { AlertCircle, CheckCircle2, Clock3, 
+         FileCheck2, Gauge, LoaderCircle, 
+         RefreshCw, Rocket, ShieldAlert,
+         ShieldCheck, XCircle,
 } from "lucide-react";
-import {
-  useEffect,
-  useState,
-} from "react";
-
+import { useEffect, useState } from "react";
 import { listDatasets } from "@/lib/datasets-api";
 import { listPrompts } from "@/lib/prompts-api";
-
-import {
-  getLatestQualityGateRun,
-  runQualityGate,
-  type QualityGateRunDetail,
-} from "@/lib/quality-gate-api";
-
-import type {
-  EvalDataset,
-  EvalDatasetRunSummary,
-  EvalRunResult,
-  PromptVersion,
-} from "@/lib/types";
+import { getLatestQualityGateRun, runQualityGate, type QualityGateRunDetail } from "@/lib/quality-gate-api";
+import type { EvalDataset, EvalDatasetRunSummary, EvalRun, EvalRunResult, PromptVersion } from "@/lib/types";
+import { listCiCdRuns } from "@/lib/ci-cd-api";
 
 function formatPercentage(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
@@ -57,6 +35,75 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
     : "An unexpected error occurred.";
+}
+
+function getBaselineFailureReasons(
+  run: EvalDatasetRunSummary | QualityGateRunDetail,
+): string[] {
+  if (
+    "baseline_failure_reasons" in run &&
+    Array.isArray(run.baseline_failure_reasons)
+  ) {
+    return run.baseline_failure_reasons;
+  }
+
+  return [];
+}
+
+function getAggregateGateFailureReasons(
+  run: EvalDatasetRunSummary | QualityGateRunDetail,
+  thresholds: {
+    minPassRate: number;
+    minRetrievalScore: number;
+    minGroundingScore: number;
+    minCitationCoverage: number;
+    minAnswerScore: number;
+    maxUnsupportedClaims: number;
+    maxAvgLatencyMs: number;
+  },
+): string[] {
+  const reasons: string[] = [];
+
+  if (run.pass_rate < thresholds.minPassRate) {
+    reasons.push(
+      `Pass rate ${formatPercentage(run.pass_rate)} is below the configured minimum ${formatPercentage(thresholds.minPassRate)}.`,
+    );
+  }
+
+  if (run.avg_retrieval_score < thresholds.minRetrievalScore) {
+    reasons.push(
+      `Average retrieval score ${formatPercentage(run.avg_retrieval_score)} is below the configured minimum ${formatPercentage(thresholds.minRetrievalScore)}.`,
+    );
+  }
+
+  if (run.avg_grounding_score < thresholds.minGroundingScore) {
+    reasons.push(
+      `Average grounding score ${formatPercentage(run.avg_grounding_score)} is below the configured minimum ${formatPercentage(thresholds.minGroundingScore)}.`,
+    );
+  }
+
+  if (run.avg_citation_coverage < thresholds.minCitationCoverage) {
+    reasons.push(
+      `Citation coverage ${formatPercentage(run.avg_citation_coverage)} is below the configured minimum ${formatPercentage(thresholds.minCitationCoverage)}.`,
+    );
+  }
+
+  if (run.total_unsupported_claims > thresholds.maxUnsupportedClaims) {
+    reasons.push(
+      `Unsupported claims ${run.total_unsupported_claims} exceeds the configured maximum ${thresholds.maxUnsupportedClaims}.`,
+    );
+  }
+
+  if (run.avg_latency_ms > thresholds.maxAvgLatencyMs) {
+    reasons.push(
+      `Average latency ${formatLatency(run.avg_latency_ms)} exceeds the configured maximum ${formatLatency(thresholds.maxAvgLatencyMs)}.`,
+    );
+  }
+
+  return [
+    ...reasons,
+    ...getBaselineFailureReasons(run),
+  ];
 }
 
 const QUALITY_THRESHOLDS = [
@@ -118,6 +165,20 @@ export function QualityGateWorkspace() {
   const [maxUnsupportedClaims, setMaxUnsupportedClaims] =
     useState(0);
   const [maxAvgLatencyMs, setMaxAvgLatencyMs] = useState(15000);
+  const [baselineRuns, setBaselineRuns] = useState<EvalRun[]>([]);
+  const [selectedBaselineRunId, setSelectedBaselineRunId] =
+    useState("");
+  const [maxPassRateDrop, setMaxPassRateDrop] = useState(0.1);
+  const [maxAnswerScoreDrop, setMaxAnswerScoreDrop] =
+    useState(0.15);
+  const [maxRetrievalScoreDrop, setMaxRetrievalScoreDrop] =
+    useState(0.15);
+  const [maxGroundingScoreDrop, setMaxGroundingScoreDrop] =
+    useState(0.1);
+  const [
+    maxCitationCoverageDrop,
+    setMaxCitationCoverageDrop,
+  ] = useState(0.1);
 
   const [ciGateToken, setCiGateToken] = useState("");
   const [runningGate, setRunningGate] = useState(false);
@@ -151,14 +212,16 @@ export function QualityGateWorkspace() {
 
       try {
         const [
-          latestRun,
-          datasetsResponse,
-          promptsResponse,
-        ] = await Promise.all([
-          getLatestQualityGateRun(),
-          listDatasets(),
-          listPrompts(),
-        ]);
+            latestRun,
+            datasetsResponse,
+            promptsResponse,
+            runsResponse,
+          ] = await Promise.all([
+            getLatestQualityGateRun(),
+            listDatasets(),
+            listPrompts(),
+            listCiCdRuns(50),
+          ]);
 
         if (cancelled) {
           return;
@@ -167,6 +230,14 @@ export function QualityGateWorkspace() {
         setQualityGateRun(latestRun);
         setDatasets(datasetsResponse.datasets);
         setPrompts(promptsResponse.prompts);
+
+        setBaselineRuns(
+          runsResponse.filter(
+            (run) =>
+              run.status === "completed" &&
+              run.quality_gate_passed,
+          ),
+        );
 
         setSelectedDatasetId(
           datasetsResponse.datasets[0]?.id ?? "",
@@ -202,6 +273,32 @@ export function QualityGateWorkspace() {
   const failedCases =
     qualityGateRun?.results.filter((result) => !result.passed) ?? [];
 
+  
+  const activeThresholds = {
+  minPassRate,
+  minRetrievalScore,
+  minGroundingScore,
+  minCitationCoverage,
+  minAnswerScore,
+  maxUnsupportedClaims,
+  maxAvgLatencyMs,
+};
+
+const manualGateFailureReasons = manualGateRun
+  ? getAggregateGateFailureReasons(
+      manualGateRun,
+      activeThresholds,
+    )
+  : [];
+
+const latestGateFailureReasons = qualityGateRun
+  ? getAggregateGateFailureReasons(
+      qualityGateRun,
+      activeThresholds,
+    )
+  : [];
+
+
     async function handleRunQualityGate() {
     if (!selectedDatasetId) {
       setError("Select a dataset first.");
@@ -231,12 +328,12 @@ export function QualityGateWorkspace() {
             min_answer_score: minAnswerScore,
             max_unsupported_claims: maxUnsupportedClaims,
             max_avg_latency_ms: maxAvgLatencyMs,
-            baseline_run_id: null,
-            max_pass_rate_drop: 0.1,
-            max_answer_score_drop: 0.15,
-            max_retrieval_score_drop: 0.15,
-            max_grounding_score_drop: 0.1,
-            max_citation_coverage_drop: 0.1,
+            baseline_run_id: selectedBaselineRunId || null,
+            max_pass_rate_drop: maxPassRateDrop,
+            max_answer_score_drop: maxAnswerScoreDrop,
+            max_retrieval_score_drop: maxRetrievalScoreDrop,
+            max_grounding_score_drop: maxGroundingScoreDrop,
+            max_citation_coverage_drop: maxCitationCoverageDrop,
           },
         },
         ciGateToken,
@@ -465,6 +562,81 @@ export function QualityGateWorkspace() {
           />
         </div>
 
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div>
+            <p className="text-sm font-semibold text-slate-950">
+              Baseline regression detection
+            </p>
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Optional: compare this run against a previous passing run.
+              If quality drops beyond the allowed tolerance, the gate will
+              fail even if the minimum thresholds pass.
+            </p>
+          </div>
+
+          <div className="mt-4">
+            <SelectField
+              label="Baseline run"
+              value={selectedBaselineRunId}
+              onChange={setSelectedBaselineRunId}
+              options={baselineRuns.map((run) => ({
+                value: run.rag_run_id,
+                label: `${run.dataset_name ?? "Unknown dataset"} · ${formatPercentage(
+                  run.pass_rate,
+                )} pass · ${formatDate(run.created_at)}`,
+              }))}
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-5">
+            <NumberField
+              label="Max pass drop"
+              value={maxPassRateDrop}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={setMaxPassRateDrop}
+            />
+
+            <NumberField
+              label="Max answer drop"
+              value={maxAnswerScoreDrop}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={setMaxAnswerScoreDrop}
+            />
+
+            <NumberField
+              label="Max retrieval drop"
+              value={maxRetrievalScoreDrop}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={setMaxRetrievalScoreDrop}
+            />
+
+            <NumberField
+              label="Max grounding drop"
+              value={maxGroundingScoreDrop}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={setMaxGroundingScoreDrop}
+            />
+
+            <NumberField
+              label="Max citation drop"
+              value={maxCitationCoverageDrop}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={setMaxCitationCoverageDrop}
+            />
+          </div>
+        </div>
+
         <label className="mt-5 block">
           <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
             Optional CI gate token
@@ -516,6 +688,38 @@ export function QualityGateWorkspace() {
             <p className="mt-2 font-mono text-[11px] text-slate-500">
               Run ID: {manualGateRun.rag_run_id}
             </p>
+
+            {manualGateFailureReasons.length > 0 && (
+              <div className="mt-4 rounded-xl border border-rose-200 bg-white/70 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-rose-700">
+                  Why deployment was blocked
+                </p>
+
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-rose-700">
+                  {manualGateFailureReasons.map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {"baseline_failure_reasons" in manualGateRun &&
+              Array.isArray(manualGateRun.baseline_failure_reasons) &&
+              manualGateRun.baseline_failure_reasons.length > 0 && (
+                <div className="mt-4 rounded-xl border border-rose-200 bg-white/70 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-rose-700">
+                    Baseline regression reasons
+                  </p>
+
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-rose-700">
+                    {manualGateRun.baseline_failure_reasons.map(
+                      (reason: string) => (
+                        <li key={reason}>{reason}</li>
+                      ),
+                    )}
+                  </ul>
+                </div>
+              )}
           </div>
         )}
       </section>
@@ -619,6 +823,26 @@ export function QualityGateWorkspace() {
               </div>
             </div>
           </section>
+
+          {!deploymentAllowed && latestGateFailureReasons.length > 0 && (
+            <section className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 p-5">
+              <div className="flex items-start gap-3">
+                <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-700" />
+
+                <div>
+                  <h3 className="font-semibold text-rose-900">
+                    Why deployment was blocked
+                  </h3>
+
+                  <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-rose-700">
+                    {latestGateFailureReasons.map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </section>
+          )}
 
           <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <MetricCard

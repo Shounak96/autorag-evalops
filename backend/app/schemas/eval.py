@@ -133,6 +133,8 @@ class EvalDatasetRunSummary(BaseModel):
     commit_sha: str | None = None
     trigger_type: str | None = None
     external_run_url: str | None = None
+    baseline_run_id: str | None = None
+    baseline_failure_reasons: list[str] = Field(default_factory=list)
 
 
 class PromptComparisonRequest(BaseModel):
