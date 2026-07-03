@@ -27,9 +27,11 @@ jobs:
         working-directory: backend
 
     env:
-      DATABASE_URL: postgresql://postgres.eobegsklfywbxumagxfk:mahjd71831234567@aws-1-us-east-2.pooler.supabase.com:6543/postgres
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/autorag_test
       CI_GATE_TOKEN: test-ci-gate-token
       GEMINI_API_KEY: test-api-key
+      GEMINI_EMBEDDING_MODEL: gemini-embedding-001
+      EMBEDDING_PROVIDER: gemini
 
     steps:
       - name: Check out repository
@@ -113,7 +115,7 @@ jobs:
         with:
           python-version: "3.10"
 
-            - name: Run AutoRAG regression gate
+      - name: Run AutoRAG regression gate
         run: python scripts/run_ci_quality_gate.py
 
       - name: Write quality-gate job summary
