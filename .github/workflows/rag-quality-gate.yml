@@ -27,7 +27,7 @@ jobs:
         working-directory: backend
 
     env:
-      DATABASE_URL: sqlite+pysqlite:///:memory:
+      DATABASE_URL: postgresql://postgres.eobegsklfywbxumagxfk:mahjd71831234567@aws-1-us-east-2.pooler.supabase.com:6543/postgres
       CI_GATE_TOKEN: test-ci-gate-token
       GEMINI_API_KEY: test-api-key
 
