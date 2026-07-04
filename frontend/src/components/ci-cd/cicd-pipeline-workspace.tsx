@@ -245,7 +245,7 @@ async function refreshRuns() {
     (prompt) => prompt.id === selectedPromptId,
   );
 
-  const githubVariables = `AUTORAG_API_BASE_URL=<your-deployed-backend-url>
+  const githubVariables = `AUTORAG_API_BASE_URL=https://autorag-evalops-api.onrender.com
   AUTORAG_DATASET_ID=${selectedDatasetId || "<select-a-dataset>"}
   AUTORAG_PROMPT_VERSION_ID=${selectedPromptId || "<select-a-prompt>"}
   AUTORAG_BASELINE_RUN_ID=${selectedBaselineRunId || ""}
