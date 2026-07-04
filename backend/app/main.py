@@ -37,13 +37,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+if settings.FRONTEND_URL:
+    allowed_origins.extend(
+        origin.strip()
+        for origin in settings.FRONTEND_URL.split(",")
+        if origin.strip()
+    )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        settings.FRONTEND_URL,
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
