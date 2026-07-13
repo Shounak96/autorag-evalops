@@ -431,7 +431,7 @@ export function DatasetsWorkspace() {
           </div>
         </div>
       ) : (
-        <section className="mt-8 grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+        <section className="mt-8 grid gap-6 2xl:grid-cols-[340px_minmax(0,1fr)]">
           <aside className="space-y-6">
             <form
               onSubmit={handleCreateDataset}
@@ -581,7 +581,7 @@ export function DatasetsWorkspace() {
                   </div>
                 </section>
 
-                <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+                <section className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_360px]">
                   <form
                     onSubmit={handleCreateTestCase}
                     className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
@@ -928,7 +928,7 @@ function RunSummaryCard({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <MiniRunMetric
           label="Pass rate"
           value={formatPercentage(summary.pass_rate)}
