@@ -375,7 +375,7 @@ async function handleSavePrompt(promptId: string) {
         </button>
       </section>
 
-      <section className="mt-8 grid gap-4 sm:grid-cols-3">
+      <section className="mt-8 grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
         <MetricCard
           label="Prompt versions"
           value={prompts.length.toString()}
@@ -459,7 +459,7 @@ async function handleSavePrompt(promptId: string) {
           />
         </div>
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-2">
+        <div className="mt-5 grid gap-4 2xl:grid-cols-2">
           <TextAreaField
             label="System prompt"
             value={newSystemPrompt}
@@ -538,16 +538,15 @@ async function handleSavePrompt(promptId: string) {
             </div>
           </div>
         ) : (
-          <div className="grid gap-5 p-5 xl:grid-cols-2">
+          <div className="grid gap-5 p-5 2xl:grid-cols-2">
             {prompts.map((prompt) => (
               <article
                 key={prompt.id}
-                className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-5"
-              >
-                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <div className="flex flex-col gap-4">
                   <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-lg font-bold text-slate-950">
+                    <div className="flex flex-wrap items-center gap-2 break-words">
+                      <h4 className="break-words text-lg font-bold leading-7 text-slate-950">
                         {prompt.name}
                       </h4>
 
@@ -560,7 +559,7 @@ async function handleSavePrompt(promptId: string) {
                     </div>
 
                     {prompt.description && (
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
+                      <p className="mt-2 max-w-3xl break-words text-sm leading-6 text-slate-500">
                         {prompt.description}
                       </p>
                     )}
@@ -570,7 +569,7 @@ async function handleSavePrompt(promptId: string) {
                     </p>
                   </div>
 
-                  <div className="flex shrink-0 flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => handleStartEdit(prompt)}
